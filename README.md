@@ -7,7 +7,7 @@ Dashboard Next.js untuk menerima telemetri ESP32, menyimpan 50 pembacaan terbaru
 - Node.js 20.9 atau lebih baru (proyek ini memakai Node.js 22).
 - Next.js, React, Tailwind CSS, MongoDB Node.js Driver, dan Recharts.
 - MongoDB database: `smart_home_city`.
-- Collections: `sensor_readings` (capped, maksimum 50 dokumen) dan `device_commands`.
+- Collections: `sensor_readings` (capped, maksimum 50 dokumen) dan `device_commands`. Jika `sensor_readings` sudah ada sebagai collection biasa, data lamanya dipertahankan dan aplikasi menggunakan `sensor_readings_latest50` sebagai collection capped.
 
 ## Skema MongoDB
 
@@ -52,7 +52,7 @@ Dashboard Next.js untuk menerima telemetri ESP32, menyimpan 50 pembacaan terbaru
 
 Di firmware, isi `WIFI_SSID` dan `WIFI_PASSWORD`, lalu ubah alamat `192.168.1.10` pada `API_READINGS_URL` dan `API_COMMANDS_URL` menjadi IPv4 komputer Anda. ESP32 dan komputer harus berada pada Wi-Fi/jaringan yang sama. Firewall Windows mungkin perlu mengizinkan koneksi masuk untuk Node.js pada jaringan privat.
 
-`sensor_readings` adalah capped collection MongoDB dengan `max: 50`. Saat pembacaan baru masuk, MongoDB otomatis menimpa/mengeluarkan dokumen paling lama; tidak ada proses pembersihan berkala atau risiko penumpukan melewati batas 50. Data diurutkan menurut waktu penerimaan server.
+Collection pembacaan aktif adalah capped collection MongoDB dengan `max: 50`. Saat pembacaan baru masuk, MongoDB otomatis menimpa/mengeluarkan dokumen paling lama; tidak ada proses pembersihan berkala atau risiko penumpukan melewati batas 50. Data diurutkan menurut waktu penerimaan server.
 
 ## API
 

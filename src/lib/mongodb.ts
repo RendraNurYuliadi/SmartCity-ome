@@ -6,6 +6,7 @@ import {
 } from "mongodb";
 
 const readingsCollectionName = "sensor_readings";
+const cappedReadingsCollectionName = "sensor_readings_latest50";
 const commandsCollectionName = "device_commands";
 const maxReadings = 50;
 
@@ -85,6 +86,7 @@ type MongoGlobal = typeof globalThis & {
 };
 
 const mongoGlobal = globalThis as MongoGlobal;
+let activeReadingsCollectionName = readingsCollectionName;
 
 function getClientPromise() {
   if (!mongoGlobal._mongoClientPromise) {
@@ -108,13 +110,26 @@ async function getDatabase(): Promise<Db> {
 async function ensureCollections(db: Db) {
   if (!mongoGlobal._mongoSetupPromise) {
     mongoGlobal._mongoSetupPromise = (async () => {
-      const readingsExists = await db
+      const originalReadings = await db
         .listCollections({ name: readingsCollectionName }, { nameOnly: false })
-        .hasNext();
+        .next();
+      activeReadingsCollectionName =
+        originalReadings &&
+        (!originalReadings.options?.capped ||
+          originalReadings.options.max !== maxReadings)
+          ? cappedReadingsCollectionName
+          : readingsCollectionName;
 
-      if (!readingsExists) {
+      let readingsInfo = await db
+        .listCollections(
+          { name: activeReadingsCollectionName },
+          { nameOnly: false },
+        )
+        .next();
+
+      if (!readingsInfo) {
         try {
-          await db.createCollection(readingsCollectionName, {
+          await db.createCollection(activeReadingsCollectionName, {
             capped: true,
             size: 1024 * 1024,
             max: maxReadings,
@@ -130,22 +145,21 @@ async function ensureCollections(db: Db) {
             throw error;
           }
         }
+        readingsInfo = await db
+          .listCollections(
+            { name: activeReadingsCollectionName },
+            { nameOnly: false },
+          )
+          .next();
       }
 
-      const info = await db
-        .listCollections({ name: readingsCollectionName }, { nameOnly: false })
-        .next();
-      if (!info?.options?.capped || info.options.max !== maxReadings) {
+      if (
+        !readingsInfo?.options?.capped ||
+        readingsInfo.options.max !== maxReadings
+      ) {
         throw new Error(
-          `Collection ${readingsCollectionName} harus capped dengan max ${maxReadings}. Hapus collection lama lalu jalankan npm run db:setup.`,
+          `Collection ${activeReadingsCollectionName} harus capped dengan max ${maxReadings}. Data collection yang sudah ada tidak dihapus.`,
         );
-      }
-      if (!info.options.validator) {
-        await db.command({
-          collMod: readingsCollectionName,
-          validator: readingsValidator,
-          validationLevel: "strict",
-        });
       }
 
       const commandsExists = await db
@@ -166,17 +180,6 @@ async function ensureCollections(db: Db) {
             throw error;
           }
         }
-      }
-
-      const commandsInfo = await db
-        .listCollections({ name: commandsCollectionName }, { nameOnly: false })
-        .next();
-      if (commandsInfo && !commandsInfo.options?.validator) {
-        await db.command({
-          collMod: commandsCollectionName,
-          validator: commandsValidator,
-          validationLevel: "strict",
-        });
       }
     })().catch((error: unknown) => {
       mongoGlobal._mongoSetupPromise = undefined;
@@ -221,7 +224,7 @@ export type DeviceCommand = {
 export async function getReadingsCollection(): Promise<Collection<SensorReading>> {
   const db = await getDatabase();
   await ensureCollections(db);
-  return db.collection<SensorReading>(readingsCollectionName);
+  return db.collection<SensorReading>(activeReadingsCollectionName);
 }
 
 export async function getCommandsCollection(): Promise<Collection<DeviceCommand>> {

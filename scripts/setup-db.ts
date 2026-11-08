@@ -9,7 +9,7 @@ loadEnvConfig(process.cwd());
 
 async function main() {
   await Promise.all([getReadingsCollection(), getCommandsCollection()]);
-  console.log("MongoDB siap: sensor_readings (maks. 50) dan device_commands.");
+  console.log("MongoDB siap: koleksi pembacaan capped (maks. 50) dan device_commands.");
   await closeMongoConnection();
 }
 
