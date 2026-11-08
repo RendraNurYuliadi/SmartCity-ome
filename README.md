@@ -48,9 +48,9 @@ Dashboard Next.js untuk menerima telemetri ESP32, menyimpan 50 pembacaan terbaru
 2. Salin `.env.example` menjadi `.env.local`; sesuaikan `MONGODB_URI` dan `MONGODB_DB` bila perlu.
 3. Instal dependensi dengan `npm install`.
 4. Siapkan collections dengan `npm run db:setup`. Aplikasi juga membuat collections saat pertama kali menerima request.
-5. Jalankan `npm run dev`, lalu buka `http://localhost:3000` pada komputer server. Untuk ESP32, gunakan IPv4 komputer tersebut (lihat `ipconfig`) dan port `3000`.
+5. Jalankan `npm run dev`, lalu buka `http://localhost:3000` pada komputer server. Untuk ESP32 lokal, gunakan IPv4 komputer tersebut (lihat `ipconfig`) dan port `3000`.
 
-Di firmware, isi `WIFI_SSID` dan `WIFI_PASSWORD`, lalu ubah alamat `192.168.1.10` pada `API_READINGS_URL` dan `API_COMMANDS_URL` menjadi IPv4 komputer Anda. ESP32 dan komputer harus berada pada Wi-Fi/jaringan yang sama. Firewall Windows mungkin perlu mengizinkan koneksi masuk untuk Node.js pada jaringan privat.
+Di firmware untuk penggunaan lokal, isi `WIFI_SSID` dan `WIFI_PASSWORD`, lalu ubah alamat `192.168.1.10` pada `API_READINGS_URL` dan `API_COMMANDS_URL` menjadi IPv4 komputer Anda. ESP32 dan komputer harus berada pada Wi-Fi/jaringan yang sama. Firewall Windows mungkin perlu mengizinkan koneksi masuk untuk Node.js pada jaringan privat.
 
 Collection pembacaan aktif adalah capped collection MongoDB dengan `max: 50`. Saat pembacaan baru masuk, MongoDB otomatis menimpa/mengeluarkan dokumen paling lama; tidak ada proses pembersihan berkala atau risiko penumpukan melewati batas 50. Data diurutkan menurut waktu penerimaan server.
 
@@ -77,12 +77,12 @@ API tidak memakai autentikasi sesuai kebutuhan proyek ini. Endpoint yang dipubli
 
 ## Menghubungkan ESP32
 
-Kode lengkap yang diperbarui ada di [`Code_iot_esp_32_Update.txt`](./Code_iot_esp_32_Update.txt). Konfigurasi awal file memakai HTTP lokal; sebelum kompilasi:
+Kode lengkap yang diperbarui ada di [`Code_iot_esp_32_Update.txt`](./Code_iot_esp_32_Update.txt). File sudah diarahkan ke API Vercel `https://smarcityandhome.vercel.app`; sebelum kompilasi:
 
 1. Pasang library ArduinoJson, DHT sensor library, LiquidCrystal I2C, dan ESP32Servo di Arduino IDE.
-2. Isi `WIFI_SSID`, `WIFI_PASSWORD`, serta IPv4 komputer lokal pada URL API di bagian atas file.
+2. Isi `WIFI_SSID` dan `WIFI_PASSWORD` untuk Wi-Fi yang digunakan ESP32. URL API HTTPS Vercel sudah diisi di bagian atas file.
 3. Simpan/ubah file menjadi `.ino`, pilih board ESP32, lalu upload.
-4. Pastikan ESP32 dan komputer server terhubung ke jaringan yang sama. Perintah LED mengubah kanal B pada GPIO19; kanal R/G tetap mati.
+4. Pastikan ESP32 tersambung ke internet. Perintah LED mengubah kanal B pada GPIO19; kanal R/G tetap mati.
 
 Firmware mempertahankan sensor yang sudah ada pada sketch awal (ultrasonik, PIR, IR parkir, LDR, water-level, SW-420, DHT11, lampu lalu lintas, servo, buzzer, dan LCD) serta mengirim nilainya ke API.
 

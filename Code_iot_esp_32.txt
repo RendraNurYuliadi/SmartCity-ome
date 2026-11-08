@@ -8,15 +8,13 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
-// MODE LOKAL: ubah IP ke alamat IPv4 komputer yang menjalankan Next.js.
-// ESP32 dan komputer harus terhubung ke jaringan Wi-Fi yang sama.
+// MODE VERCEL: ganti SSID dan password dengan Wi-Fi tempat ESP32 digunakan.
 const char* WIFI_SSID = "NAMA_WIFI";
 const char* WIFI_PASSWORD = "PASSWORD_WIFI";
-const char* API_READINGS_URL = "http://192.168.1.10:3000/api/readings";
-const char* API_COMMANDS_URL = "http://192.168.1.10:3000/api/commands";
+const char* API_READINGS_URL = "https://smarcityandhome.vercel.app/api/readings";
+const char* API_COMMANDS_URL = "https://smarcityandhome.vercel.app/api/commands";
 const char* DEVICE_ID = "esp32-smart-city";
-// Ganti menjadi 1 dan gunakan URL https saat migrasi ke Vercel.
-#define API_USE_HTTPS 0
+#define API_USE_HTTPS 1
 
 const unsigned long INTERVAL_KIRIM_API = 2000UL;
 const unsigned long INTERVAL_CEK_PERINTAH = 1000UL;
