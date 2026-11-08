@@ -6,3 +6,4 @@ out/
 npm-debug.log*
 *.tsbuildinfo
 /AGENTS.md
+esp32_secrets.h

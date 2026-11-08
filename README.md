@@ -77,13 +77,15 @@ API tidak memakai autentikasi sesuai kebutuhan proyek ini. Endpoint yang dipubli
 
 ## Menghubungkan ESP32
 
-Kode lengkap yang diperbarui ada di [`Code_iot_esp_32_Update.txt`](./Code_iot_esp_32_Update.txt). File sudah diarahkan ke API Vercel `https://smarcityandhome.vercel.app`; sebelum kompilasi:
+Kode lengkap yang diperbarui ada di [`Code_iot_esp_32_Update.txt`](./Code_iot_esp_32_Update.txt). File sudah diarahkan ke API Vercel `https://smarcityandhome.vercel.app`; Wi-Fi disimpan terpisah dari kode agar password tidak terunggah ke GitHub.
 
 1. Pasang library ArduinoJson, DHT sensor library, LiquidCrystal I2C, dan ESP32Servo di Arduino IDE.
-2. Isi `WIFI_SSID` dan `WIFI_PASSWORD` untuk Wi-Fi yang digunakan ESP32. URL API HTTPS Vercel sudah diisi di bagian atas file.
-3. Simpan/ubah file menjadi `.ino`, pilih board ESP32, lalu upload.
+2. Salin [`esp32_secrets.example.h`](./esp32_secrets.example.h) sebagai `esp32_secrets.h` di folder sketch Arduino yang sama dengan file `.ino`, lalu isi SSID dan password Wi-Fi di file lokal itu. `esp32_secrets.h` diabaikan Git.
+3. Simpan/ubah firmware menjadi `.ino` di folder yang sama dengan `esp32_secrets.h`, pilih board ESP32, lalu upload.
 4. Pastikan ESP32 tersambung ke internet. Perintah LED mengubah kanal B pada GPIO19; kanal R/G tetap mati.
 
 Firmware mempertahankan sensor yang sudah ada pada sketch awal (ultrasonik, PIR, IR parkir, LDR, water-level, SW-420, DHT11, lampu lalu lintas, servo, buzzer, dan LCD) serta mengirim nilainya ke API.
+
+ESP32 klasik hanya mendukung Wi-Fi 2,4 GHz. Jika jaringan yang dipilih hanya berjalan pada 5 GHz, aktifkan/pilih SSID 2,4 GHz dari router atau hotspot; jaringan 2,4 GHz dan 5 GHz boleh memakai nama berbeda.
 
 > Saat nanti beralih ke Vercel, mode HTTPS firmware saat ini memakai `WiFiClientSecure::setInsecure()` untuk memudahkan pengujian. Untuk produksi, sebaiknya gunakan `setCACert()` dan root CA yang sesuai.

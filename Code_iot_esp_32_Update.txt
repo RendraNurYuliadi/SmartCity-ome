@@ -7,10 +7,8 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include "esp32_secrets.h"
 
-// MODE VERCEL: ganti SSID dan password dengan Wi-Fi tempat ESP32 digunakan.
-const char* WIFI_SSID = "NAMA_WIFI";
-const char* WIFI_PASSWORD = "PASSWORD_WIFI";
 const char* API_READINGS_URL = "https://smarcityandhome.vercel.app/api/readings";
 const char* API_COMMANDS_URL = "https://smarcityandhome.vercel.app/api/commands";
 const char* DEVICE_ID = "esp32-smart-city";
