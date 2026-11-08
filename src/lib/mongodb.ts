@@ -1,5 +1,6 @@
 import {
   MongoClient,
+  type ObjectId,
   type Collection,
   type Db,
   type Document,
@@ -8,6 +9,7 @@ import {
 const readingsCollectionName = "sensor_readings";
 const cappedReadingsCollectionName = "sensor_readings_latest50";
 const commandsCollectionName = "device_commands";
+const messagesCollectionName = "sensor_messages";
 const maxReadings = 50;
 
 const readingsValidator: Document = {
@@ -76,6 +78,34 @@ const commandsValidator: Document = {
       _id: { bsonType: "string" },
       rgbLedOn: { bsonType: "bool" },
       updatedAt: { bsonType: "date" },
+    },
+  },
+};
+
+const messagesValidator: Document = {
+  $jsonSchema: {
+    bsonType: "object",
+    required: [
+      "deviceId",
+      "type",
+      "title",
+      "body",
+      "severity",
+      "occurredAt",
+      "isRead",
+      "readAt",
+      "readingId",
+    ],
+    properties: {
+      deviceId: { bsonType: "string" },
+      type: { bsonType: "string" },
+      title: { bsonType: "string" },
+      body: { bsonType: "string" },
+      severity: { enum: ["critical", "warning", "info"] },
+      occurredAt: { bsonType: "date" },
+      isRead: { bsonType: "bool" },
+      readAt: { bsonType: ["date", "null"] },
+      readingId: { bsonType: "objectId" },
     },
   },
 };
@@ -181,6 +211,30 @@ async function ensureCollections(db: Db) {
           }
         }
       }
+
+      const messagesExists = await db
+        .listCollections({ name: messagesCollectionName }, { nameOnly: true })
+        .hasNext();
+      if (!messagesExists) {
+        try {
+          await db.createCollection(messagesCollectionName, {
+            validator: messagesValidator,
+          });
+        } catch (error) {
+          if (
+            typeof error !== "object" ||
+            error === null ||
+            !("code" in error) ||
+            error.code !== 48
+          ) {
+            throw error;
+          }
+        }
+      }
+
+      await db
+        .collection(messagesCollectionName)
+        .createIndex({ isRead: 1, occurredAt: -1 });
     })().catch((error: unknown) => {
       mongoGlobal._mongoSetupPromise = undefined;
       throw error;
@@ -221,6 +275,18 @@ export type DeviceCommand = {
   updatedAt: Date;
 };
 
+export type SensorMessage = {
+  deviceId: string;
+  type: string;
+  title: string;
+  body: string;
+  severity: "critical" | "warning" | "info";
+  occurredAt: Date;
+  isRead: boolean;
+  readAt: Date | null;
+  readingId: ObjectId;
+};
+
 export async function getReadingsCollection(): Promise<Collection<SensorReading>> {
   const db = await getDatabase();
   await ensureCollections(db);
@@ -231,6 +297,12 @@ export async function getCommandsCollection(): Promise<Collection<DeviceCommand>
   const db = await getDatabase();
   await ensureCollections(db);
   return db.collection<DeviceCommand>(commandsCollectionName);
+}
+
+export async function getMessagesCollection(): Promise<Collection<SensorMessage>> {
+  const db = await getDatabase();
+  await ensureCollections(db);
+  return db.collection<SensorMessage>(messagesCollectionName);
 }
 
 export async function closeMongoConnection() {

@@ -60,8 +60,24 @@ Collection pembacaan aktif adalah capped collection MongoDB dengan `max: 50`. Sa
 - `GET /api/readings?limit=50` — membaca paling banyak 50 data terbaru.
 - `GET /api/commands` — membaca status perintah LED terakhir.
 - `POST /api/commands` dengan `{"rgbLedOn":true}` atau `{"rgbLedOn":false}` — mengubah status perintah LED.
+- `GET /api/messages` — mengambil inbox dan jumlah pesan belum dibaca.
+- `POST /api/messages` dengan `{"ids":["<message-id>"]}` atau `{"all":true}` — menandai pesan sudah dibaca.
+- `POST /api/chat` — mengambil snapshot sensor langsung dari MongoDB lalu mengirim pertanyaan dan snapshot tersebut ke model AI gratis OpenRouter.
+
+Pesan dibuat saat sensor berubah menjadi kondisi banjir, getaran, gerakan, suhu di atas 28 °C, atau parkir penuh. Dashboard memeriksa data dan badge pesan setiap 1,5 detik; membuka pesan menandainya sudah dibaca dan mengurangi angka badge.
 
 Dashboard memeriksa API setiap 1,5 detik. ESP32 mengirim telemetri setiap 2 detik dan memeriksa perintah setiap 1 detik. Polling ini juga kompatibel dengan deployment serverless Vercel tanpa koneksi WebSocket permanen.
+
+## Chatbot OpenRouter gratis
+
+Chatbot hanya mengirim request ke model router [`openrouter/free`](https://openrouter.ai/docs/guides/routing/routers/free-router), yang memilih model gratis OpenRouter dan tidak memakai fallback ke model berbayar. Model gratis dapat memiliki batas/rate limit dan kadang tidak tersedia; jika limit tercapai, coba lagi nanti.
+
+1. Buat API key OpenRouter baru di [OpenRouter API Keys](https://openrouter.ai/settings/keys). Jangan gunakan key yang pernah ditempel di chat; buat ulang jika key tersebut pernah aktif.
+2. Di Vercel → Project → Settings → Environment Variables, tambahkan `OPENROUTER_API_KEY` dengan key baru sebagai value. Jangan tambahkan `NEXT_PUBLIC_` pada nama variabel.
+3. Pilih Production dan Preview, simpan, lalu redeploy agar variable diterapkan.
+4. Untuk penggunaan lokal, tambahkan `OPENROUTER_API_KEY=<key-baru>` ke `.env.local` yang diabaikan Git.
+
+Key hanya dibaca server-side; tidak pernah dikirim ke browser. Setiap pertanyaan mengambil lima pembacaan ESP32 terbaru langsung dari MongoDB sebelum prompt dikirim. Prompt juga menjelaskan semua variabel, pin, logika sensor, dan ambang firmware.
 
 API tidak memakai autentikasi sesuai kebutuhan proyek ini. Endpoint yang dipublikasikan dapat menerima data/perintah dari siapa saja; gunakan hanya pada jaringan/lingkungan yang sesuai.
 
@@ -72,17 +88,20 @@ API tidak memakai autentikasi sesuai kebutuhan proyek ini. Endpoint yang dipubli
 3. Isi Vercel Project → Settings → Environment Variables:
    - `MONGODB_URI`: connection string Atlas.
    - `MONGODB_DB`: `smart_home_city`.
+   - `OPENROUTER_API_KEY`: API key OpenRouter (server-side, tanpa prefix `NEXT_PUBLIC_`).
 4. Pastikan akses jaringan/IP Vercel ke MongoDB diizinkan, lalu deploy. Collection capped dibuat otomatis pada request pertama.
 5. Ubah kedua URL firmware menjadi URL deployment HTTPS, lalu set `API_USE_HTTPS` ke `1`.
 
 ## Menghubungkan ESP32
 
-Kode lengkap yang diperbarui ada di [`Code_iot_esp_32_Update.txt`](./Code_iot_esp_32_Update.txt). File sudah diarahkan ke API Vercel `https://smarcityandhome.vercel.app`; Wi-Fi disimpan terpisah dari kode agar password tidak terunggah ke GitHub.
+Kode firmware final satu file ada di `Code_iot_esp_32_Update.txt` dan sudah berisi konfigurasi Wi-Fi serta endpoint Vercel. File ini mengandung password Wi-Fi; jangan commit atau push perubahan lokal tersebut ke repository.
 
 1. Pasang library ArduinoJson, DHT sensor library, LiquidCrystal I2C, dan ESP32Servo di Arduino IDE.
-2. Salin [`esp32_secrets.example.h`](./esp32_secrets.example.h) sebagai `esp32_secrets.h` di folder sketch Arduino yang sama dengan file `.ino`, lalu isi SSID dan password Wi-Fi di file lokal itu. `esp32_secrets.h` diabaikan Git.
-3. Simpan/ubah firmware menjadi `.ino` di folder yang sama dengan `esp32_secrets.h`, pilih board ESP32, lalu upload.
+2. Buat sketch baru di Arduino IDE, salin seluruh isi `Code_iot_esp_32_Update.txt`, lalu simpan sebagai `Code_iot_esp_32_Update.ino`.
+3. Pilih board dan port ESP32, lalu upload.
 4. Pastikan ESP32 tersambung ke internet. Perintah LED mengubah kanal B pada GPIO19; kanal R/G tetap mati.
+
+Untuk mengganti Wi-Fi, edit nilai `WIFI_SSID` dan `WIFI_PASSWORD` di bagian atas file.
 
 Firmware mempertahankan sensor yang sudah ada pada sketch awal (ultrasonik, PIR, IR parkir, LDR, water-level, SW-420, DHT11, lampu lalu lintas, servo, buzzer, dan LCD) serta mengirim nilainya ke API.
 

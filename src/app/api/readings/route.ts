@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  getMessagesCollection,
   getReadingsCollection,
   maxReadings,
   type SensorReading,
@@ -53,6 +54,98 @@ function isReadingPayload(
   );
 }
 
+function createAlertMessages(
+  previous: SensorReading | null,
+  current: Omit<SensorReading, "recordedAt">,
+  occurredAt: Date,
+) {
+  const alerts: Array<{
+    deviceId: string;
+    type: string;
+    title: string;
+    body: string;
+    severity: "critical" | "warning" | "info";
+    occurredAt: Date;
+    isRead: boolean;
+    readAt: null;
+  }> = [];
+  const risingEdge = (active: boolean, wasActive: boolean) => active && !wasActive;
+
+  if (risingEdge(current.floodDetected, previous?.floodDetected ?? false)) {
+    alerts.push({
+      deviceId: current.deviceId,
+      type: "flood",
+      title: "Peringatan banjir",
+      body: `Water level mencapai ADC ${current.waterLevelRaw} (ambang banjir firmware: 500). Periksa sensor dan area.`,
+      severity: "critical",
+      occurredAt,
+      isRead: false,
+      readAt: null,
+    });
+  }
+
+  if (risingEdge(current.vibrationDetected, previous?.vibrationDetected ?? false)) {
+    alerts.push({
+      deviceId: current.deviceId,
+      type: "vibration",
+      title: "Getaran terdeteksi",
+      body: "Sensor getaran SW-420 mengaktifkan alarm. Periksa perangkat dan lokasi sensor.",
+      severity: "warning",
+      occurredAt,
+      isRead: false,
+      readAt: null,
+    });
+  }
+
+  if (risingEdge(current.pirDetected, previous?.pirDetected ?? false)) {
+    alerts.push({
+      deviceId: current.deviceId,
+      type: "motion",
+      title: "Gerakan terdeteksi",
+      body: "Sensor PIR mendeteksi gerakan dan membuka palang keluar.",
+      severity: "info",
+      occurredAt,
+      isRead: false,
+      readAt: null,
+    });
+  }
+
+  if (
+    current.temperatureC !== null &&
+    current.temperatureC > 28 &&
+    !(previous?.temperatureC !== null && previous?.temperatureC !== undefined && previous.temperatureC > 28)
+  ) {
+    alerts.push({
+      deviceId: current.deviceId,
+      type: "high-temperature",
+      title: "Suhu melewati ambang",
+      body: `Suhu ${current.temperatureC.toFixed(1)} °C melewati ambang firmware 28 °C; servo suhu dapat terbuka.`,
+      severity: "warning",
+      occurredAt,
+      isRead: false,
+      readAt: null,
+    });
+  }
+
+  if (
+    current.parking.occupied === 3 &&
+    (previous?.parking.occupied ?? 0) < 3
+  ) {
+    alerts.push({
+      deviceId: current.deviceId,
+      type: "parking-full",
+      title: "Parkir penuh",
+      body: "Semua 3 slot parkir terdeteksi terisi.",
+      severity: "info",
+      occurredAt,
+      isRead: false,
+      readAt: null,
+    });
+  }
+
+  return alerts;
+}
+
 export async function GET(request: Request) {
   try {
     const requestedLimit = Number(new URL(request.url).searchParams.get("limit") ?? maxReadings);
@@ -88,9 +181,20 @@ export async function POST(request: Request) {
       ...payload,
       recordedAt: new Date(),
     };
-    const result = await getReadingsCollection().then((collection) =>
-      collection.insertOne(reading),
+    const readingsCollection = await getReadingsCollection();
+    const previous = await readingsCollection.findOne(
+      { deviceId: reading.deviceId },
+      { sort: { recordedAt: -1 } },
     );
+    const result = await readingsCollection.insertOne(reading);
+    const alerts = createAlertMessages(previous, reading, reading.recordedAt);
+    if (alerts.length > 0) {
+      await getMessagesCollection().then((collection) =>
+        collection.insertMany(
+          alerts.map((alert) => ({ ...alert, readingId: result.insertedId })),
+        ),
+      );
+    }
 
     return NextResponse.json(
       { ok: true, id: result.insertedId.toString(), recordedAt: reading.recordedAt },

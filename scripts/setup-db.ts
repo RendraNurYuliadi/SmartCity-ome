@@ -3,13 +3,20 @@ import {
   closeMongoConnection,
   getReadingsCollection,
   getCommandsCollection,
+  getMessagesCollection,
 } from "../src/lib/mongodb";
 
 loadEnvConfig(process.cwd());
 
 async function main() {
-  await Promise.all([getReadingsCollection(), getCommandsCollection()]);
-  console.log("MongoDB siap: koleksi pembacaan capped (maks. 50) dan device_commands.");
+  await Promise.all([
+    getReadingsCollection(),
+    getCommandsCollection(),
+    getMessagesCollection(),
+  ]);
+  console.log(
+    "MongoDB siap: pembacaan capped (maks. 50), device_commands, dan sensor_messages.",
+  );
   await closeMongoConnection();
 }
 
