@@ -6,6 +6,7 @@ import {
   ArrowDown,
   ArrowUpRight,
   Bot,
+  CheckCircle2,
   CheckCheck,
   CarFront,
   Check,
@@ -15,6 +16,7 @@ import {
   Gauge,
   Lightbulb,
   LoaderCircle,
+  Menu,
   MessageCircle,
   MessageSquare,
   Radio,
@@ -36,6 +38,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { SensorReading } from "@/lib/mongodb";
 
 type Reading = Omit<SensorReading, "recordedAt"> & {
@@ -122,6 +126,16 @@ export default function Home() {
     refreshedAt: string;
     readingAt: string | null;
   } | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [enteringDashboard, setEnteringDashboard] = useState(false);
+
+  const enterDashboard = async () => {
+    if (enteringDashboard) return;
+    setEnteringDashboard(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 5000));
+    setShowSplash(false);
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -279,6 +293,7 @@ export default function Home() {
 
   const selectPage = (nextPage: Page) => {
     setPage(nextPage);
+    setMobileMenuOpen(false);
     if (nextPage === "messages") void refresh();
   };
 
@@ -299,14 +314,113 @@ export default function Home() {
 
   return (
     <main className="grid-lines min-h-screen">
-      <div className="mx-auto flex min-h-screen max-w-[1440px]">
-        <aside className="hidden w-[248px] shrink-0 border-r border-white/[0.07] px-5 py-7 lg:flex lg:flex-col">
-          <a className="flex items-center gap-3 px-2" href="#" onClick={() => setPage("dashboard")}>
+      {showSplash && (
+        <section
+          className="fixed inset-0 z-[100] flex min-h-screen items-center justify-center overflow-hidden bg-[#080d0a] px-5 py-10"
+          aria-label="Selamat datang"
+        >
+          <div className="splash-grid pointer-events-none absolute inset-0" />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#9fe85d]/[0.08] blur-[110px]" />
+          <div className="relative w-full max-w-2xl animate-[splash-in_.7s_ease-out_both] rounded-[2rem] border border-white/[0.1] bg-[#0e1511]/90 p-7 shadow-[0_35px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:p-12">
+            <div className="flex items-center gap-3">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#b7f36b] text-[#11180e] shadow-[0_0_38px_rgba(183,243,107,0.2)]">
+                <Activity size={25} strokeWidth={2.4} />
+              </span>
+              <div>
+                <p className="text-sm font-semibold tracking-wide">NOVEN<span className="text-[#b7f36b]">TRA</span></p>
+                <p className="mt-0.5 text-[10px] tracking-[0.2em] text-[#86948a]">SMART CITY SYSTEM</p>
+              </div>
+              <span className="ml-auto hidden items-center gap-2 rounded-full border border-[#b7f36b]/15 bg-[#b7f36b]/[0.05] px-3 py-1.5 text-[10px] text-[#c7fa8f] sm:flex">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#b7f36b]" /> LIVE MONITORING
+              </span>
+            </div>
+
+            <div className="mt-12 max-w-xl">
+              <p className="flex items-center gap-2 text-[11px] font-medium tracking-[0.22em] text-[#a5b497]">
+                <span className="h-px w-6 bg-[#b7f36b]" /> SMART HOME &amp; CITY
+              </p>
+              <h1 className="mt-5 text-4xl font-semibold leading-[1.13] tracking-tight text-white sm:text-6xl">
+                Kota lebih<br /><span className="text-[#b7f36b]">cerdas.</span> Data lebih<br className="hidden sm:block" /> dekat.
+              </h1>
+              <p className="mt-5 max-w-lg text-sm leading-7 text-[#9ba79e] sm:text-base">
+                Pantau sensor, baca peringatan, dan kendalikan ESP32 dari satu dashboard—dengan bantuan AI untuk memahami kondisi perangkat.
+              </p>
+            </div>
+
+            <div className="mt-9 grid gap-2 sm:grid-cols-3">
+              {[
+                { label: "Monitoring", value: "Data sensor realtime", icon: Radio },
+                { label: "Notifikasi", value: "Peringatan perangkat", icon: MessageSquare },
+                { label: "AI Assistant", value: "Analisis kondisi ESP32", icon: Bot },
+              ].map(({ label, value, icon: Icon }) => (
+                <div key={label} className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
+                  <Icon size={16} className="text-[#b7f36b]" />
+                  <p className="mt-3 text-[10px] tracking-[0.12em] text-[#76837a]">{label}</p>
+                  <p className="mt-1 text-xs font-medium text-[#dce5de]">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+              <button
+                onClick={() => void enterDashboard()}
+                disabled={enteringDashboard}
+                aria-describedby={enteringDashboard ? "dashboard-loading" : undefined}
+                className="group flex items-center gap-3 rounded-xl bg-[#b7f36b] px-5 py-3.5 text-sm font-semibold text-[#15200f] transition hover:-translate-y-0.5 hover:bg-[#c7fa8a] disabled:cursor-wait disabled:hover:translate-y-0"
+              >
+                {enteringDashboard ? (
+                  <>
+                    <LoaderCircle size={17} className="animate-spin" />
+                    Menyiapkan Dashboard
+                  </>
+                ) : (
+                  <>
+                    Masuk ke Dashboard <ArrowUpRight size={17} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </>
+                )}
+              </button>
+              <span className="flex items-center gap-2 text-[11px] text-[#7d8a81]">
+                {enteringDashboard ? (
+                  <span id="dashboard-loading" role="status" aria-live="polite">
+                    Dashboard akan terbuka dalam 5 detik
+                  </span>
+                ) : (
+                  <><CheckCircle2 size={14} className="text-[#b7f36b}" /> Tanpa login · ESP32 terhubung</>
+                )}
+              </span>
+            </div>
+            {enteringDashboard && (
+              <div
+                className="mt-5 h-1 overflow-hidden rounded-full bg-white/10"
+                role="progressbar"
+                aria-label="Menyiapkan dashboard"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuetext="Menyiapkan dashboard selama 5 detik"
+              >
+                <div className="h-full w-full origin-left animate-[dashboard-loading_5s_linear_forwards] rounded-full bg-[#b7f36b]" />
+              </div>
+            )}
+          </div>
+          <style jsx>{`@keyframes splash-in { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
+        </section>
+      )}
+      <div className="flex min-h-screen w-full">
+        {mobileMenuOpen && (
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm lg:hidden"
+            aria-label="Tutup menu"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+        <aside className={`sidebar-drawer fixed inset-y-0 left-0 z-50 flex h-screen w-[280px] shrink-0 flex-col border-r border-white/[0.07] bg-[#0b110e] px-5 py-7 lg:sticky lg:top-0 lg:z-20 lg:w-[248px] ${mobileMenuOpen ? "is-open" : ""}`}>
+          <a className="flex items-center gap-3 px-2" href="#" onClick={() => selectPage("dashboard")}>
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#b7f36b] text-[#121a10]">
               <Activity size={21} strokeWidth={2.5} />
             </span>
             <span>
-              <span className="block text-sm font-semibold tracking-wide">NUSA<span className="text-[#b7f36b]">IOT</span></span>
+              <span className="block text-sm font-semibold tracking-wide">NOVEN<span className="text-[#b7f36b]">TRA</span></span>
               <span className="mt-0.5 block text-[10px] tracking-[0.18em] text-[#87948b]">SMART CITY SYSTEM</span>
             </span>
           </a>
@@ -366,8 +480,15 @@ export default function Home() {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="flex min-h-[76px] items-center justify-between border-b border-white/[0.07] px-5 sm:px-8">
+          <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between border-b border-white/[0.07] bg-[#090e0c]/85 px-4 backdrop-blur-xl sm:px-8">
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] text-[#b8c4bb] hover:bg-white/[0.05] lg:hidden"
+                aria-label="Buka menu"
+              >
+                <Menu size={18} />
+              </button>
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#b7f36b] text-[#121a10] lg:hidden">
                 <Activity size={19} />
               </span>
@@ -384,15 +505,6 @@ export default function Home() {
               <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.1] bg-[#171f1a] text-xs font-semibold text-[#c3d2c7]">SC</span>
             </div>
           </header>
-
-          <div className="flex gap-2 border-b border-white/[0.07] px-5 py-3 lg:hidden">
-            <button onClick={() => selectPage("dashboard")} className={`rounded-lg px-3 py-2 text-xs ${page === "dashboard" ? "bg-[#b7f36b]/10 text-[#c7fa8f]" : "text-[#98a49d]"}`}>Dashboard</button>
-            <button onClick={() => selectPage("control")} className={`rounded-lg px-3 py-2 text-xs ${page === "control" ? "bg-[#b7f36b]/10 text-[#c7fa8f]" : "text-[#98a49d]"}`}>Kontrol</button>
-            <button onClick={() => selectPage("messages")} className={`relative rounded-lg px-3 py-2 text-xs ${page === "messages" ? "bg-[#b7f36b]/10 text-[#c7fa8f]" : "text-[#98a49d]"}`}>
-              Message {unreadCount > 0 && <span className="ml-1 rounded-full bg-[#f45f57] px-1.5 py-0.5 text-[10px] text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}
-            </button>
-            <button onClick={() => selectPage("chat")} className={`rounded-lg px-3 py-2 text-xs ${page === "chat" ? "bg-[#b7f36b]/10 text-[#c7fa8f]" : "text-[#98a49d]"}`}>Chat AI</button>
-          </div>
 
           <section className="px-5 py-7 sm:px-8 sm:py-9">
             <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
@@ -635,8 +747,10 @@ export default function Home() {
                     )}
                     {chatEntries.map((entry, index) => (
                       <div key={`${entry.role}-${index}`} className={`flex ${entry.role === "user" ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${entry.role === "user" ? "bg-[#b7f36b] text-[#17200f]" : "border border-white/[0.07] bg-white/[0.035] text-[#dce5de]"}`}>
-                          {entry.content}
+                        <div className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-6 ${entry.role === "user" ? "whitespace-pre-wrap bg-[#b7f36b] text-[#17200f]" : "chat-markdown border border-white/[0.07] bg-white/[0.035] text-[#dce5de]"}`}>
+                          {entry.role === "assistant" ? (
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.content}</ReactMarkdown>
+                          ) : entry.content}
                         </div>
                       </div>
                     ))}
@@ -695,7 +809,7 @@ export default function Home() {
           </section>
 
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] px-5 py-4 text-[10px] text-[#68756c] sm:px-8">
-            <span>NUSAIOT · SMART HOME &amp; CITY</span>
+            <span>NOVENTRA · SMART HOME &amp; CITY</span>
             <span>MongoDB · ESP32 · Next.js</span>
           </footer>
         </div>

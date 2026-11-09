@@ -1,3 +1,7 @@
+@import "@fontsource/poppins/400.css";
+@import "@fontsource/poppins/500.css";
+@import "@fontsource/poppins/600.css";
+@import "@fontsource/poppins/700.css";
 @import "tailwindcss";
 
 :root {
@@ -20,7 +24,7 @@ body {
     radial-gradient(ellipse at 86% 0%, rgba(107, 157, 73, 0.12), transparent 32rem),
     var(--background);
   color: #eef4ef;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Poppins", sans-serif;
 }
 
 button {
@@ -35,4 +39,160 @@ button {
   background-image: linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
   background-size: 34px 34px;
+}
+
+.chat-markdown {
+  overflow-wrap: anywhere;
+}
+
+.chat-markdown > :first-child {
+  margin-top: 0;
+}
+
+.chat-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3 {
+  margin: 1.1em 0 0.45em;
+  color: #eef4ef;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.chat-markdown h1 {
+  font-size: 1.08rem;
+}
+
+.chat-markdown h2 {
+  font-size: 1rem;
+}
+
+.chat-markdown h3 {
+  font-size: 0.92rem;
+}
+
+.chat-markdown p {
+  margin: 0.65em 0;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  margin: 0.7em 0;
+  padding-left: 1.5rem;
+}
+
+.chat-markdown ul {
+  list-style: disc;
+}
+
+.chat-markdown ol {
+  list-style: decimal;
+}
+
+.chat-markdown li {
+  margin: 0.3em 0;
+  padding-left: 0.2rem;
+}
+
+.chat-markdown li::marker {
+  color: #b7f36b;
+  font-weight: 600;
+}
+
+.chat-markdown strong {
+  color: #d7f8b5;
+  font-weight: 600;
+}
+
+.chat-markdown blockquote {
+  margin: 0.8em 0;
+  border-left: 2px solid #b7f36b;
+  padding-left: 0.9rem;
+  color: #aab5ad;
+}
+
+.chat-markdown code {
+  border-radius: 0.3rem;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 0.1rem 0.3rem;
+  color: #d7f8b5;
+  font-size: 0.85em;
+}
+
+.chat-markdown pre {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.8rem;
+}
+
+.chat-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.chat-markdown table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.chat-markdown th,
+.chat-markdown td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.chat-markdown th {
+  color: #d7f8b5;
+}
+
+.splash-grid {
+  background-image:
+    linear-gradient(rgba(183, 243, 107, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(183, 243, 107, 0.045) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(ellipse at center, black 10%, transparent 78%);
+}
+
+@keyframes dashboard-loading {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.sidebar-drawer {
+  translate: -100% 0;
+  transition: translate 300ms ease;
+}
+
+.sidebar-drawer.is-open {
+  translate: 0 0;
+}
+
+@media (min-width: 64rem) {
+  .sidebar-drawer {
+    translate: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

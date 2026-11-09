@@ -79,6 +79,8 @@ Chatbot hanya mengirim request ke model router [`openrouter/free`](https://openr
 
 Key hanya dibaca server-side; tidak pernah dikirim ke browser. Setiap pertanyaan mengambil lima pembacaan ESP32 terbaru langsung dari MongoDB sebelum prompt dikirim. Prompt juga menjelaskan semua variabel, pin, logika sensor, dan ambang firmware.
 
+Custom system prompt chatbot dapat diedit di `src/lib/chat-prompt.ts`. Instruksi format jawabannya menggunakan Markdown; dashboard merender heading, teks tebal, daftar, tabel, dan blok kode dengan styling khusus.
+
 API tidak memakai autentikasi sesuai kebutuhan proyek ini. Endpoint yang dipublikasikan dapat menerima data/perintah dari siapa saja; gunakan hanya pada jaringan/lingkungan yang sesuai.
 
 ## Deploy ke Vercel (nanti)
