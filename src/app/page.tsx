@@ -14,6 +14,7 @@ import {
   CloudRain,
   Droplets,
   Gauge,
+  Images,
   Lightbulb,
   LoaderCircle,
   Menu,
@@ -46,7 +47,7 @@ type Reading = Omit<SensorReading, "recordedAt"> & {
   _id: string;
   recordedAt: string;
 };
-type Page = "dashboard" | "control" | "messages" | "chat";
+type Page = "dashboard" | "control" | "messages" | "chat" | "gallery";
 type DeviceCommands = {
   rgbLedOn: boolean;
   streetLightOverride: boolean | null;
@@ -84,7 +85,254 @@ const pageArtwork: Record<Page, { image: string; kicker: string; description: st
     kicker: "AI · Sensor assistant",
     description: "Tanyakan kondisi terkini perangkat dan sensor ESP32.",
   },
+  gallery: {
+    image: "/images/dashboard-scene.svg",
+    kicker: "NOVENTRA · Project gallery",
+    description: "Dokumentasi prototipe Smart Home & City dan tim Kelompok 3.",
+  },
 };
+
+const teamMembers = [
+  {
+    name: "Amelia Puji Lestari",
+    image: "/images/ourTeam/Amelia Puji Lestari.jpeg",
+    alt: "Foto anggota tim Amelia Puji Lestari",
+  },
+  {
+    name: "Herliana Tri Cahyanti",
+    image: "/images/ourTeam/Herliana Tri Cahyanti.jpeg",
+    alt: "Foto anggota tim Herliana Tri Cahyanti",
+  },
+  {
+    name: "Rendra Nur Yuliadi",
+    image: "/images/ourTeam/Rendra Nur Yuliadi.jpg",
+    alt: "Foto anggota tim Rendra Nur Yuliadi",
+  },
+  {
+    name: "Wulan Nurfitriani",
+    image: "/images/ourTeam/Wulan Nurfitriani.jpeg",
+    alt: "Foto anggota tim Wulan Nurfitriani",
+  },
+];
+
+const projectImages = [
+  {
+    image: "/images/galeryProject/WhatsApp Image 2026-11-10 at 11.49.21.jpeg",
+    title: "Marka dan koridor jalan",
+    description:
+      "Sudut miniatur memperlihatkan marka jalan berwarna cerah, rambu lalu lintas, serta lampu di tepi jalur. Elemen ini membangun konteks kawasan yang dipantau sebagai sebuah sistem kota, bukan sekadar rangkaian sensor terpisah.",
+    alt: "Miniatur koridor jalan dengan marka dan rambu lalu lintas",
+  },
+  {
+    image: "/images/galeryProject/WhatsApp Image 2026-11-10 at 11.49.24 (1).jpeg",
+    title: "Indikator slot parkir",
+    description:
+      "Dokumentasi area parkir menampilkan penanda slot B dan C di samping modul berlampu. Pada implementasi, tiga sensor IR memantau okupansi setiap slot dan dashboard merangkum status terisi maupun tersedia.",
+    alt: "Area miniatur parkir dengan penanda slot B dan C serta modul indikator",
+  },
+  {
+    image: "/images/galeryProject/WhatsApp Image 2026-11-10 at 11.49.24.jpeg",
+    title: "Persimpangan dari sisi kawasan",
+    description:
+      "Tampak lintasan dan persimpangan dari sudut rendah, dengan lampu lalu lintas, rambu, serta bangunan miniatur di sepanjang jalan. Susunan ini menunjukkan bagaimana beberapa titik aktivitas disatukan dalam satu prototipe Smart City.",
+    alt: "Persimpangan miniatur dengan lampu lalu lintas dan bangunan",
+  },
+  {
+    image: "/images/galeryProject/WhatsApp Image 2026-11-10 at 11.49.31.jpeg",
+    title: "Lampu lalu lintas pada jalur utama",
+    description:
+      "Foto menyorot beberapa lampu sinyal yang ditempatkan di sepanjang ruas jalan model. Pada sistem, keluaran lampu lalu lintas berganti melalui fase hijau, kuning, dan merah secara berkala.",
+    alt: "Lampu lalu lintas miniatur pada jalur utama prototipe",
+  },
+  {
+    image: "/images/galeryProject/WhatsApp Image 2026-11-10 at 11.49.32.jpeg",
+    title: "Tata letak jalur dan parkir",
+    description:
+      "Tampak atas memperlihatkan garis pembatas jalan dan area dengan label slot parkir. Tata letak ini membantu menjelaskan hubungan antara jalur kendaraan, titik parkir, dan pembacaan sensor IR yang dikirim ke dashboard.",
+    alt: "Tata letak miniatur jalan dan area parkir berlabel",
+  },
+  {
+    image: "/images/galeryProject/WhatsApp Image 2026-11-10 at 11.49.33.jpeg",
+    title: "Rangkaian kawasan dan simpang",
+    description:
+      "Sudut pandang lebar memperlihatkan beberapa ruas yang bertemu, lampu sinyal, marka, dan elemen lanskap dalam satu maket. Proyek menghubungkan gambaran fisik ini dengan monitoring sensor dan kendali perangkat melalui web.",
+    alt: "Pemandangan lebar maket kawasan dengan persimpangan dan lampu",
+  },
+  {
+    image: "/images/galeryProject/WhatsApp Image 2026-11-10 at 11.49.34 (1).jpeg",
+    title: "Detail ruang hijau kota",
+    description:
+      "Dokumentasi dekat menampilkan pohon dan area hijau yang menjadi bagian dari lingkungan maket. Detail lanskap melengkapi konteks rumah dan jalan pada simulasi Smart Home & City.",
+    alt: "Detail pohon dan ruang hijau pada maket kota",
+  },
+  {
+    image: "/images/galeryProject/WhatsApp Image 2026-11-10 at 11.49.34 (2).jpeg",
+    title: "Bangunan dan akses kawasan",
+    description:
+      "Foto horizontal menangkap beberapa bangunan miniatur, jalan penghubung, dan area biru di bagian depan. Komposisi tersebut memperlihatkan skala kawasan serta jalur yang menghubungkan tiap bagian maket.",
+    alt: "Bangunan miniatur dan akses jalan pada kawasan Smart City",
+  },
+  {
+    image: "/images/galeryProject/WhatsApp Image 2026-11-10 at 11.49.34.jpeg",
+    title: "Perspektif lengkap lintasan kota",
+    description:
+      "Tampak menyeluruh dari sisi lain memperlihatkan jaringan jalan, persimpangan, bangunan, dan penanda kawasan. Dokumentasi ini menjadi penutup rangkaian foto untuk melihat maket sebagai satu kesatuan.",
+    alt: "Perspektif menyeluruh maket lintasan dan persimpangan kota",
+  },
+];
+
+function GalleryContent() {
+  return (
+    <div className="space-y-8">
+      <section className="relative overflow-hidden rounded-3xl border border-[#b7f36b]/15 bg-[linear-gradient(125deg,rgba(183,243,107,0.09),rgba(16,23,20,0.96)_52%,rgba(131,201,255,0.07))] p-6 sm:p-8">
+        <div className="absolute -right-10 -top-20 h-64 w-64 rounded-full bg-[#b7f36b]/[0.07] blur-3xl" />
+        <div className="relative grid gap-8 xl:grid-cols-[1.3fr_0.7fr]">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#b7f36b]/20 bg-[#b7f36b]/[0.07] px-3 py-1.5 text-[10px] font-medium tracking-[0.12em] text-[#c7fa8f]">
+              <Activity size={13} /> PROYEK IOT · KELOMPOK 3
+            </span>
+            <h2 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              NOVEN<span className="text-[#b7f36b]">TRA</span>
+            </h2>
+            <p className="mt-2 text-sm font-medium text-[#dce5de]">
+              Smart Home &amp; City Monitoring System
+            </p>
+            <p className="mt-5 max-w-3xl text-sm leading-7 text-[#aab5ad]">
+              Noventra menggabungkan prototipe kawasan kota dengan sensor dan
+              aktuator berbasis ESP32. Data suhu dan kelembapan, kondisi parkir,
+              gerakan, intensitas cahaya, jarak, level air, serta getaran
+              dikumpulkan untuk membantu pengguna memahami keadaan perangkat
+              dan lingkungan. Informasi disajikan dalam dashboard web, sementara
+              beberapa output dapat berjalan otomatis berdasarkan sensor atau
+              dipilih melalui menu kontrol.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {["ESP32", "IoT Monitoring", "Sensor & Aktuator", "Dashboard Web"].map((item) => (
+                <span key={item} className="rounded-full border border-white/[0.08] bg-black/10 px-3 py-1.5 text-[10px] text-[#bdc8c0]">
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            {[
+              {
+                title: "Pantau",
+                detail: "DHT11, ultrasonik, PIR, IR parkir, LDR, sensor air, dan SW-420.",
+                icon: Gauge,
+              },
+              {
+                title: "Otomatiskan",
+                detail: "Lampu jalan, palang servo, lampu lalu lintas, dan alarm merespons sistem sensor.",
+                icon: Radio,
+              },
+              {
+                title: "Kendalikan",
+                detail: "Dashboard menyediakan status perangkat dan pilihan kontrol web untuk output terpilih.",
+                icon: Lightbulb,
+              },
+            ].map(({ title, detail, icon: Icon }) => (
+              <article key={title} className="flex gap-3 rounded-2xl border border-white/[0.07] bg-[#0b110e]/55 p-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#b7f36b]/10 text-[#b7f36b]">
+                  <Icon size={17} />
+                </span>
+                <div>
+                  <h3 className="text-xs font-semibold text-[#e5eee7]">{title}</h3>
+                  <p className="mt-1 text-[10px] leading-5 text-[#95a198]">{detail}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold tracking-[0.18em] text-[#9daa9f]">DOKUMENTASI</p>
+            <h2 className="mt-1 text-xl font-semibold">Galeri prototipe proyek</h2>
+            <p className="mt-1 text-xs leading-5 text-[#89968e]">
+              Sembilan foto maket: jalur, persimpangan, lampu, parkir, dan detail kawasan.
+            </p>
+          </div>
+          <span className="rounded-full border border-white/[0.08] px-3 py-1.5 text-[10px] text-[#aab5ad]">
+            {projectImages.length} foto dokumentasi
+          </span>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+          {projectImages.map((item, index) => (
+            <article
+              key={item.image}
+              className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101714]/90 transition duration-300 hover:-translate-y-1 hover:border-[#b7f36b]/25 hover:shadow-[0_18px_48px_rgba(0,0,0,0.25)]"
+            >
+              <div className="relative aspect-[4/3] overflow-hidden bg-[#0b110e]">
+                <Image
+                  src={item.image}
+                  alt={item.alt}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                  className="object-cover transition duration-500 group-hover:scale-[1.04]"
+                />
+                <span className="absolute left-3 top-3 rounded-full border border-white/10 bg-[#090e0c]/75 px-2.5 py-1 text-[9px] font-medium tracking-[0.1em] text-[#dce5de] backdrop-blur">
+                  FOTO {String(index + 1).padStart(2, "0")}
+                </span>
+              </div>
+              <div className="p-4 sm:p-5">
+                <h3 className="text-sm font-semibold text-[#e8f0ea]">{item.title}</h3>
+                <p className="mt-2 text-xs leading-6 text-[#98a49d]">{item.description}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-4">
+          <p className="text-[10px] font-semibold tracking-[0.18em] text-[#9daa9f]">DI BALIK NOVENTRA</p>
+          <h2 className="mt-1 text-xl font-semibold">Anggota Kelompok 3</h2>
+          <p className="mt-1 text-xs leading-5 text-[#89968e]">
+            Tim pengembang proyek IoT Noventra · Fakultas Teknik Informasi.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {teamMembers.map((member, index) => (
+            <article
+              key={member.name}
+              className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101714]/90 transition hover:border-[#b7f36b]/25"
+            >
+              <div className="relative aspect-[4/4.3] overflow-hidden bg-[#18221b]">
+                <Image
+                  src={member.image}
+                  alt={member.alt}
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                  className="object-cover transition duration-500 group-hover:scale-[1.04]"
+                />
+                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#090e0c]/90 to-transparent" />
+                <span className="absolute bottom-3 left-4 text-[9px] font-medium tracking-[0.16em] text-[#c7fa8f]">
+                  NOVENTRA · 0{index + 1}
+                </span>
+              </div>
+              <div className="p-4">
+                <h3 className="text-sm font-semibold text-[#e8f0ea]">{member.name}</h3>
+                <p className="mt-1 text-[10px] text-[#89968e]">Anggota Kelompok 3</p>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold text-[#dce5de]">NOVENTRA · Proyek IoT Kelompok 3</p>
+            <p className="mt-1 text-[10px] text-[#89968e]">Fakultas Teknik Informasi</p>
+          </div>
+          <span className="rounded-full border border-[#b7f36b]/15 bg-[#b7f36b]/[0.05] px-3 py-1.5 text-[10px] text-[#c7fa8f]">
+            Smart Home &amp; City
+          </span>
+        </div>
+      </section>
+    </div>
+  );
+}
 
 function PageArtwork({ page }: { page: Page }) {
   const artwork = pageArtwork[page];
@@ -388,6 +636,8 @@ export default function Home() {
       ? "Data Dashboard"
       : page === "control"
         ? "Kontrol ESP32"
+        : page === "gallery"
+          ? "Galeri Noventra"
         : page === "messages"
           ? "Message"
           : "AI Sensor";
@@ -531,6 +781,15 @@ export default function Home() {
               <Bot size={18} /> Chatbot AI
               {page === "chat" && <ChevronRight className="ml-auto" size={15} />}
             </button>
+            <button
+              onClick={() => selectPage("gallery")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+                page === "gallery" ? "bg-[#b7f36b]/10 font-medium text-[#c7fa8f]" : "text-[#9ba79f] hover:bg-white/[0.04]"
+              }`}
+            >
+              <Images size={18} /> Galeri Noventra
+              {page === "gallery" && <ChevronRight className="ml-auto" size={15} />}
+            </button>
           </nav>
 
           <div className="mt-auto rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
@@ -572,12 +831,12 @@ export default function Home() {
           <section className={`px-5 py-7 sm:px-8 sm:py-9 ${page === "chat" ? "flex flex-1 flex-col" : ""}`}>
             <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-xs font-medium tracking-[0.16em] text-[#9daa9f]">{page === "messages" ? "PUSAT NOTIFIKASI" : page === "chat" ? "ASISTEN SENSOR" : "MONITORING PERANGKAT"}</p>
+                <p className="text-xs font-medium tracking-[0.16em] text-[#9daa9f]">{page === "messages" ? "PUSAT NOTIFIKASI" : page === "chat" ? "ASISTEN SENSOR" : page === "gallery" ? "CERITA PROYEK" : "MONITORING PERANGKAT"}</p>
                 <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-[30px]">
-                  {page === "dashboard" ? <>Kondisi <span className="text-[#b7f36b]">saat ini</span></> : page === "control" ? <>Kontrol <span className="text-[#b7f36b]">perangkat</span></> : page === "messages" ? <>Pesan <span className="text-[#b7f36b]">sensor</span></> : <>Chatbot <span className="text-[#b7f36b]">Gen AI</span></>}
+                  {page === "dashboard" ? <>Kondisi <span className="text-[#b7f36b]">saat ini</span></> : page === "control" ? <>Kontrol <span className="text-[#b7f36b]">perangkat</span></> : page === "messages" ? <>Pesan <span className="text-[#b7f36b]">sensor</span></> : page === "gallery" ? <>Galeri <span className="text-[#b7f36b]">Noventra</span></> : <>Chatbot <span className="text-[#b7f36b]">Gen AI</span></>}
                 </h1>
                 <p className="mt-2 text-sm text-[#8d9a91]">
-                  {page === "dashboard" ? "Ringkasan sensor dan aktivitas ESP32 secara realtime." : page === "control" ? "Kendalikan LED RGB, lampu jalan LDR, dan servo suhu DHT11." : page === "messages" ? "Baca dan kelola peringatan yang dikirim dari sensor ESP32." : "Tanya kondisi ESP32; data terbaru dibaca langsung sebelum AI menjawab."}
+                  {page === "dashboard" ? "Ringkasan sensor dan aktivitas ESP32 secara realtime." : page === "control" ? "Kendalikan LED RGB, lampu jalan LDR, dan servo suhu DHT11." : page === "messages" ? "Baca dan kelola peringatan yang dikirim dari sensor ESP32." : page === "gallery" ? "Kenali visi proyek, dokumentasi maket, dan anggota tim Kelompok 3." : "Tanya kondisi ESP32; data terbaru dibaca langsung sebelum AI menjawab."}
                 </p>
               </div>
               <button onClick={() => void refresh()} className="flex items-center gap-2 rounded-xl border border-white/[0.1] px-3.5 py-2.5 text-xs text-[#c2ccc5] transition hover:bg-white/[0.05]">
@@ -723,6 +982,8 @@ export default function Home() {
                   <p className="mt-3 text-[10px] leading-5 text-[#7f8c83]">DHT11 tetap mengatur servo di mode otomatis. Jika suhu di atas 28 °C, override web diterapkan setelah 10 detik.</p>
                 </article>
               </div>
+            ) : page === "gallery" ? (
+              <GalleryContent />
             ) : page === "messages" ? (
               <article className="rounded-2xl border border-white/[0.08] bg-[#101714]/90 p-5 sm:p-6">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">

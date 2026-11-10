@@ -2,6 +2,8 @@
 
 Dashboard Next.js untuk menerima telemetri ESP32, menyimpan 50 pembacaan terbaru di MongoDB, serta mengendalikan LED RGB, lampu jalan berbasis LDR, dan servo suhu DHT11.
 
+Menu Galeri Noventra menampilkan dokumentasi prototipe proyek IoT Kelompok 3, profil empat anggota, dan sembilan foto proyek dari folder `public/images`.
+
 ## Stack
 
 - Node.js 20.9 atau lebih baru (proyek ini memakai Node.js 22).
