@@ -71,11 +71,11 @@ Collection pembacaan aktif adalah capped collection MongoDB dengan `max: 50`. Sa
 
 Pesan dibuat saat sensor berubah menjadi kondisi banjir, getaran, gerakan, suhu di atas 28 °C, atau parkir penuh. Dashboard memeriksa data dan badge pesan setiap 1,5 detik; membuka pesan menandainya sudah dibaca dan mengurangi angka badge.
 
-Dashboard memeriksa API setiap 1,5 detik. ESP32 mengirim telemetri setiap 1 detik dan memeriksa perintah setiap 1 detik. Palang PIR dan ultrasonik kembali tertutup 3 detik setelah pemicunya berhenti. Override web untuk lampu jalan atau servo suhu menunggu 10 detik bila kondisi pemicu sensor terkait sedang aktif; selain itu perintah diterapkan segera. Polling ini juga kompatibel dengan deployment serverless Vercel tanpa koneksi WebSocket permanen.
+Dashboard memeriksa API setiap 1,5 detik. ESP32 mengirim telemetri setiap 1 detik dan memeriksa perintah setiap 1 detik. Palang PIR dan ultrasonik kembali tertutup 3 detik setelah pemicunya berhenti. Override web untuk lampu jalan atau servo suhu diterapkan langsung tanpa jeda; mode otomatis sensor tetap tersedia. Polling ini juga kompatibel dengan deployment serverless Vercel tanpa koneksi WebSocket permanen.
 
 ## Chatbot OpenRouter gratis
 
-Chatbot hanya mengirim request ke model router [`openrouter/free`](https://openrouter.ai/docs/guides/routing/routers/free-router), yang memilih model gratis OpenRouter dan tidak memakai fallback ke model berbayar. Model gratis dapat memiliki batas/rate limit dan kadang tidak tersedia; jika limit tercapai, coba lagi nanti.
+Chatbot menggunakan router gratis [`openrouter/free`](https://openrouter.ai/docs/guides/routing/routers/free-router). Jika model router berhasil dipanggil tetapi tidak menghasilkan teks, server mencoba model gratis NVIDIA Nemotron sebagai fallback; tidak ada model berbayar yang digunakan. Model gratis dapat memiliki batas/rate limit dan kadang tidak tersedia; jika kedua model sedang sibuk, coba lagi nanti.
 
 1. Buat API key OpenRouter baru di [OpenRouter API Keys](https://openrouter.ai/settings/keys). Jangan gunakan key yang pernah ditempel di chat; buat ulang jika key tersebut pernah aktif.
 2. Di Vercel → Project → Settings → Environment Variables, tambahkan `OPENROUTER_API_KEY` dengan key baru sebagai value. Jangan tambahkan `NEXT_PUBLIC_` pada nama variabel.

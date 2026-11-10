@@ -962,7 +962,7 @@ export default function Home() {
                     disabled={loadingCommand}
                     onChange={(value) => void updateDeviceCommands({ streetLightOverride: value })}
                   />
-                  <p className="mt-3 text-[10px] leading-5 text-[#7f8c83]">LDR tetap bekerja di mode otomatis. Jika kondisi LDR memicu lampu, override web diterapkan setelah 10 detik.</p>
+                  <p className="mt-3 text-[10px] leading-5 text-[#7f8c83]">LDR tetap bekerja di mode otomatis. Perintah web diterapkan langsung tanpa jeda.</p>
                 </article>
 
                 <article className="rounded-2xl border border-white/[0.08] bg-[#101714]/90 p-5 sm:p-6">
@@ -979,7 +979,7 @@ export default function Home() {
                     disabled={loadingCommand}
                     onChange={(value) => void updateDeviceCommands({ temperatureServoOverride: value })}
                   />
-                  <p className="mt-3 text-[10px] leading-5 text-[#7f8c83]">DHT11 tetap mengatur servo di mode otomatis. Jika suhu di atas 28 °C, override web diterapkan setelah 10 detik.</p>
+                  <p className="mt-3 text-[10px] leading-5 text-[#7f8c83]">DHT11 tetap mengatur servo di mode otomatis. Perintah web diterapkan langsung tanpa jeda.</p>
                 </article>
               </div>
             ) : page === "gallery" ? (

@@ -144,7 +144,6 @@ const int batasJarak = 10;
 // WAKTU TUNGGU PALANG
 // =================================
 const unsigned long waktuTunggu = 3000UL;
-const unsigned long waktuTundaOverrideWeb = 10000UL;
 
 // =================================
 // WAKTU TRAFFIC LIGHT
@@ -226,14 +225,8 @@ bool statusLampuJalan = false;
 bool statusLampuRGB = false;
 bool overrideLampuJalanAktif = false;
 bool statusLampuJalanManual = false;
-bool overrideLampuJalanTertunda = false;
-bool statusLampuJalanTertunda = false;
-unsigned long waktuMulaiTundaLampuJalan = 0;
 bool overrideServoSuhuAktif = false;
 bool statusServoSuhuManual = false;
-bool overrideServoSuhuTertunda = false;
-bool statusServoSuhuTertunda = false;
-unsigned long waktuMulaiTundaServoSuhu = 0;
 char updatedAtPerintahTerakhir[32] = "";
 bool statusPerintahLampuJalanDiketahui = false;
 bool statusPerintahServoSuhuDiketahui = false;
@@ -429,14 +422,6 @@ void cekSlotParkir() {
 // FUNGSI LDR DAN LED LAMPU JALAN
 // =================================
 void terapkanStatusLampuJalan() {
-  if (overrideLampuJalanTertunda &&
-      millis() - waktuMulaiTundaLampuJalan >= waktuTundaOverrideWeb) {
-    overrideLampuJalanTertunda = false;
-    overrideLampuJalanAktif = true;
-    statusLampuJalanManual = statusLampuJalanTertunda;
-    Serial.println("Override lampu jalan dari web diterapkan.");
-  }
-
   statusLampuJalan = overrideLampuJalanAktif ?
                      statusLampuJalanManual :
                      nilaiLDRTerakhir >= BATAS_LDR;
@@ -458,19 +443,9 @@ void cekLampuJalan() {
 }
 
 void aturOverrideLampuJalan(bool enabled, bool value) {
-  overrideLampuJalanTertunda = false;
-  overrideLampuJalanAktif = false;
-
   if (!enabled) {
+    overrideLampuJalanAktif = false;
     terapkanStatusLampuJalan();
-    return;
-  }
-
-  if (nilaiLDRTerakhir >= BATAS_LDR) {
-    statusLampuJalanTertunda = value;
-    waktuMulaiTundaLampuJalan = millis();
-    overrideLampuJalanTertunda = true;
-    Serial.println("Override lampu jalan dijadwalkan 10 detik.");
     return;
   }
 
@@ -906,25 +881,9 @@ void aturServoSuhu() {
   );
 }
 
-void terapkanOverrideServoSuhuTertunda() {
-  if (!overrideServoSuhuTertunda ||
-      millis() - waktuMulaiTundaServoSuhu < waktuTundaOverrideWeb) {
-    return;
-  }
-
-  overrideServoSuhuTertunda = false;
-  overrideServoSuhuAktif = true;
-  statusServoSuhuManual = statusServoSuhuTertunda;
-  statusServoSuhuTerbuka = statusServoSuhuManual;
-  aturServoSuhu();
-  Serial.println("Override servo suhu dari web diterapkan.");
-}
-
 void aturOverrideServoSuhu(bool enabled, bool value) {
-  overrideServoSuhuTertunda = false;
-  overrideServoSuhuAktif = false;
-
   if (!enabled) {
+    overrideServoSuhuAktif = false;
     if (suhuValid) {
       if (suhuSekarang > BATAS_SUHU) {
         statusServoSuhuTerbuka = true;
@@ -933,14 +892,6 @@ void aturOverrideServoSuhu(bool enabled, bool value) {
       }
     }
     aturServoSuhu();
-    return;
-  }
-
-  if (suhuValid && suhuSekarang > BATAS_SUHU) {
-    statusServoSuhuTertunda = value;
-    waktuMulaiTundaServoSuhu = millis();
-    overrideServoSuhuTertunda = true;
-    Serial.println("Override servo suhu dijadwalkan 10 detik.");
     return;
   }
 
@@ -1011,15 +962,13 @@ void cekSuhuDanServo() {
   // KONTROL SERVO BERDASARKAN SUHU
   // =================================
 
-  if (!overrideServoSuhuAktif && !overrideServoSuhuTertunda &&
-      suhuSekarang > BATAS_SUHU) {
+  if (!overrideServoSuhuAktif && suhuSekarang > BATAS_SUHU) {
 
     // Di atas 28 derajat: buka 90 derajat
     // dan tetap terbuka selama suhu belum turun di bawah 28
     statusServoSuhuTerbuka = true;
 
-  } else if (!overrideServoSuhuAktif && !overrideServoSuhuTertunda &&
-             suhuSekarang < BATAS_SUHU) {
+  } else if (!overrideServoSuhuAktif && suhuSekarang < BATAS_SUHU) {
 
     // Di bawah 28 derajat: tutup ke 0 derajat
     statusServoSuhuTerbuka = false;
@@ -1440,7 +1389,6 @@ void loop() {
   // =================================
 
   cekSuhuDanServo();
-  terapkanOverrideServoSuhuTertunda();
 
   jadwalkanDataSensorKeAPI();
 }

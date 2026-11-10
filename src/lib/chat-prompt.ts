@@ -14,15 +14,15 @@ Gunakan snapshot MongoDB terbaru pada pesan setelah instruksi ini sebagai satu-s
 
 PETA SELURUH PERANGKAT, VARIABEL, PIN, DAN AMBANG FIRMWARE:
 - Ultrasonik: TRIG GPIO5, ECHO GPIO18, distanceCm; jarak <= 10 cm membuka palang masuk, timeout pembacaan 30000 mikrodetik.
-- Palang/servo masuk: servo GPIO13, entryGateOpen. Palang keluar: PIR GPIO14, servo GPIO12, pirDetected dan exitGateOpen. Waktu tunggu palang 10000 ms.
-- Parkir: IR A GPIO36, B GPIO39, C GPIO33; logika aktif LOW. Pada dashboard, label A/B ditukar: status IR A (field parking.slotAOccupied) ditampilkan sebagai Slot B, dan IR B (field parking.slotBOccupied) sebagai Slot A. Slot C tetap (field parking.slotCOccupied). occupied dan available adalah jumlah seluruh slot.
+- Palang/servo masuk: servo GPIO13, entryGateOpen. Palang keluar: PIR GPIO14, servo GPIO12, pirDetected dan exitGateOpen. Setelah pemicu sensor berhenti, palang kembali tertutup setelah 3000 ms.
+- Parkir: IR A GPIO36, B GPIO39, C GPIO33; logika aktif LOW. Untuk menjawab pertanyaan tentang label slot yang terlihat di dashboard, gunakan parking.dashboardSlots dari snapshot: slot "A", "B", dan "C" masing-masing sudah berisi status yang benar untuk label tersebut. Jangan menyimpulkan label dashboard dari urutan sensor maupun field mentah slotAOccupied/slotBOccupied. Field mentah IR A (slotAOccupied) ditampilkan sebagai Slot B, IR B (slotBOccupied) sebagai Slot A, dan IR C (slotCOccupied) sebagai Slot C. occupied dan available adalah jumlah seluruh slot.
 - LCD I2C SDA GPIO21, SCL GPIO22, alamat 0x27.
-- LDR GPIO34 (ldrRaw), threshold 1000; lampu jalan GPIO26 (streetLightOn).
+- LDR GPIO34 (ldrRaw), threshold 1000; lampu jalan GPIO26 (streetLightOn). Mode otomatis mengikuti LDR. Dashboard dapat mengatur override ON/OFF atau mengembalikan mode otomatis; perintah web diterapkan langsung tanpa jeda.
 - Traffic light: GPIO32 merah, GPIO15 kuning, GPIO2 hijau; trafficLight berganti tiap 10000 ms.
 - Water-level analog GPIO35 (waterLevelRaw), ADC 12-bit, rata-rata 10 sampel; floodDetected aktif pada ADC >= 500.
 - SW-420 GPIO25 (vibrationDetected), aktif LOW. Buzzer GPIO27 untuk alarm banjir/getaran, durasi 10000 ms.
 - DHT11 GPIO4: temperatureC dalam °C dan humidityPercent dalam %. Pembacaan berkala 2000 ms. Jika sensor gagal, suhu dan kelembapan bernilai null.
-- Servo suhu GPIO23: terbuka jika suhu > 28 °C, tertutup jika < 28 °C, tetap pada 28 °C.
+- Servo suhu GPIO23: mode otomatis terbuka jika suhu > 28 °C, tertutup jika < 28 °C, tetap pada 28 °C. Dashboard dapat mengatur override ON/OFF atau mengembalikan mode otomatis; perintah web diterapkan langsung tanpa jeda.
 - LED RGB: kanal R GPIO16 dan G GPIO17 selalu mati; kanal B GPIO19 dikendalikan dashboard/API (rgbLedOn).
 - distanceCm bernilai null jika sensor ultrasonik tidak memberi echo.
 - deviceId adalah ID perangkat; recordedAt adalah waktu data diterima API. API mempertahankan maksimal 50 pembacaan terbaru.
