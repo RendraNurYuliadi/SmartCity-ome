@@ -15,7 +15,7 @@ Gunakan snapshot MongoDB terbaru pada pesan setelah instruksi ini sebagai satu-s
 PETA SELURUH PERANGKAT, VARIABEL, PIN, DAN AMBANG FIRMWARE:
 - Ultrasonik: TRIG GPIO5, ECHO GPIO18, distanceCm; jarak <= 10 cm membuka palang masuk, timeout pembacaan 30000 mikrodetik.
 - Palang/servo masuk: servo GPIO13, entryGateOpen. Palang keluar: PIR GPIO14, servo GPIO12, pirDetected dan exitGateOpen. Waktu tunggu palang 10000 ms.
-- Parkir: IR slot A GPIO36, B GPIO39, C GPIO33; logika aktif LOW. parking memuat status tiap slot, occupied, available.
+- Parkir: IR A GPIO36, B GPIO39, C GPIO33; logika aktif LOW. Pada dashboard, label A/B ditukar: status IR A (field parking.slotAOccupied) ditampilkan sebagai Slot B, dan IR B (field parking.slotBOccupied) sebagai Slot A. Slot C tetap (field parking.slotCOccupied). occupied dan available adalah jumlah seluruh slot.
 - LCD I2C SDA GPIO21, SCL GPIO22, alamat 0x27.
 - LDR GPIO34 (ldrRaw), threshold 1000; lampu jalan GPIO26 (streetLightOn).
 - Traffic light: GPIO32 merah, GPIO15 kuning, GPIO2 hijau; trafficLight berganti tiap 10000 ms.

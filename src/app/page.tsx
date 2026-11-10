@@ -121,11 +121,6 @@ export default function Home() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState("");
-  const [chatSnapshot, setChatSnapshot] = useState<{
-    model: string;
-    refreshedAt: string;
-    readingAt: string | null;
-  } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [enteringDashboard, setEnteringDashboard] = useState(false);
@@ -255,7 +250,6 @@ export default function Home() {
     setChatInput("");
     setChatLoading(true);
     setChatError("");
-    setChatSnapshot(null);
 
     try {
       const response = await fetch("/api/chat", {
@@ -265,12 +259,9 @@ export default function Home() {
       });
       const result: {
         answer?: string;
-        model?: string;
-        refreshedAt?: string;
-        readingAt?: string | null;
         error?: string;
       } = await response.json();
-      if (!response.ok || !result.answer || !result.model || !result.refreshedAt) {
+      if (!response.ok || !result.answer) {
         throw new Error(result.error || "AI gagal menjawab.");
       }
 
@@ -278,11 +269,6 @@ export default function Home() {
         ...current,
         { role: "assistant", content: result.answer! },
       ]);
-      setChatSnapshot({
-        model: result.model,
-        refreshedAt: result.refreshedAt,
-        readingAt: result.readingAt ?? null,
-      });
       void refresh();
     } catch (cause) {
       setChatError(cause instanceof Error ? cause.message : "Gagal menghubungi AI.");
@@ -299,8 +285,8 @@ export default function Home() {
 
   const occupied = latest?.parking.occupied ?? 0;
   const slots = [
-    { name: "Slot A", occupied: latest?.parking.slotAOccupied ?? false },
-    { name: "Slot B", occupied: latest?.parking.slotBOccupied ?? false },
+    { name: "Slot A", occupied: latest?.parking.slotBOccupied ?? false },
+    { name: "Slot B", occupied: latest?.parking.slotAOccupied ?? false },
     { name: "Slot C", occupied: latest?.parking.slotCOccupied ?? false },
   ];
   const pageTitle =
@@ -723,7 +709,7 @@ export default function Home() {
                 )}
               </article>
             ) : (
-              <div className="grid gap-5 xl:grid-cols-[1.4fr_0.8fr]">
+              <div className="grid gap-5">
                 <article className="flex min-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101714]/90">
                   <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-4">
                     <div className="flex items-center gap-3">
@@ -776,34 +762,6 @@ export default function Home() {
                     <p className="mt-2 px-1 text-[10px] text-[#718078]">Menggunakan router model gratis OpenRouter. Model gratis bisa mengalami batas penggunaan.</p>
                   </form>
                 </article>
-                <div className="space-y-5">
-                  <article className="rounded-2xl border border-white/[0.08] bg-[#101714]/90 p-5">
-                    <div className="flex items-center gap-2 text-sm font-semibold"><Radio size={16} className="text-[#b7f36b]" /> Snapshot sensor</div>
-                    <p className="mt-2 text-xs leading-5 text-[#89968e]">Setiap pertanyaan mengambil 5 pembacaan terbaru langsung dari database sebelum dikirim ke AI.</p>
-                    <div className="mt-4 space-y-3">
-                      {[
-                        ["Suhu", latest?.temperatureC == null ? "--" : `${latest.temperatureC.toFixed(1)} °C`],
-                        ["Kelembapan", latest?.humidityPercent == null ? "--" : `${latest.humidityPercent.toFixed(0)} %`],
-                        ["Slot terisi", `${latest?.parking.occupied ?? 0} / 3`],
-                        ["Level air", latest ? `${latest.waterLevelRaw} ADC` : "--"],
-                        ["Update diterima", latest ? formatTime(latest.recordedAt) : "Belum ada data"],
-                      ].map(([label, value]) => (
-                        <div key={label} className="flex justify-between gap-3 border-b border-white/[0.05] pb-2 text-xs last:border-0"><span className="text-[#89968e]">{label}</span><span className="text-right text-[#d4ddd6]">{value}</span></div>
-                      ))}
-                    </div>
-                  </article>
-                  <article className="rounded-2xl border border-[#b7f36b]/10 bg-[#b7f36b]/[0.035] p-5">
-                    <div className="flex items-center gap-2 text-sm font-medium text-[#d5f8b3]"><CheckCheck size={16} /> Model dan biaya</div>
-                    <p className="mt-3 text-xs leading-5 text-[#a0afa2]">Request hanya memakai <code className="text-[#d5f8b3]">openrouter/free</code>. Router ini memilih model gratis; tidak ada fallback ke model berbayar. Jika model gratis mencapai batas, chat menampilkan error untuk dicoba lagi.</p>
-                    {chatSnapshot && (
-                      <div className="mt-4 border-t border-white/[0.07] pt-3 text-[10px] leading-5 text-[#89968e]">
-                        Model: {chatSnapshot.model}<br />
-                        Snapshot dimuat: {new Date(chatSnapshot.refreshedAt).toLocaleTimeString("id-ID")}<br />
-                        Waktu data: {chatSnapshot.readingAt ? new Date(chatSnapshot.readingAt).toLocaleTimeString("id-ID") : "belum ada pembacaan"}
-                      </div>
-                    )}
-                  </article>
-                </div>
               </div>
             )}
           </section>

@@ -42,6 +42,8 @@ Dashboard Next.js untuk menerima telemetri ESP32, menyimpan 50 pembacaan terbaru
 
 `device_commands` menyimpan `{ "_id": "esp32-smart-city", "rgbLedOn": "boolean", "updatedAt": "Date" }`.
 
+Pada dashboard, label Slot A dan Slot B ditukar: `parking.slotAOccupied` (IR A/GPIO36) ditampilkan sebagai Slot B, sedangkan `parking.slotBOccupied` (IR B/GPIO39) ditampilkan sebagai Slot A. Data mentah API dan jumlah total slot tidak berubah.
+
 ## Menjalankan lokal
 
 1. Pastikan MongoDB berjalan dan dapat diakses.
