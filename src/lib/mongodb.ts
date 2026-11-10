@@ -77,6 +77,8 @@ const commandsValidator: Document = {
     properties: {
       _id: { bsonType: "string" },
       rgbLedOn: { bsonType: "bool" },
+      streetLightOverride: { bsonType: ["bool", "null"] },
+      temperatureServoOverride: { bsonType: ["bool", "null"] },
       updatedAt: { bsonType: "date" },
     },
   },
@@ -260,6 +262,7 @@ export type SensorReading = {
   pirDetected: boolean;
   ldrRaw: number;
   streetLightOn: boolean;
+  temperatureServoOpen?: boolean;
   waterLevelRaw: number;
   floodDetected: boolean;
   vibrationDetected: boolean;
@@ -272,6 +275,8 @@ export type SensorReading = {
 export type DeviceCommand = {
   _id: string;
   rgbLedOn: boolean;
+  streetLightOverride?: boolean | null;
+  temperatureServoOverride?: boolean | null;
   updatedAt: Date;
 };
 

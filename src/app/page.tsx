@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import {
   Activity,
   ArrowDown,
-  ArrowUpRight,
   Bot,
-  CheckCircle2,
   CheckCheck,
   CarFront,
   Check,
+  CheckCircle2,
   ChevronRight,
   CloudRain,
   Droplets,
@@ -47,6 +47,11 @@ type Reading = Omit<SensorReading, "recordedAt"> & {
   recordedAt: string;
 };
 type Page = "dashboard" | "control" | "messages" | "chat";
+type DeviceCommands = {
+  rgbLedOn: boolean;
+  streetLightOverride: boolean | null;
+  temperatureServoOverride: boolean | null;
+};
 type InboxMessage = {
   _id: string;
   type: string;
@@ -57,6 +62,87 @@ type InboxMessage = {
   isRead: boolean;
 };
 type ChatEntry = { role: "user" | "assistant"; content: string };
+
+const pageArtwork: Record<Page, { image: string; kicker: string; description: string }> = {
+  dashboard: {
+    image: "/images/dashboard-scene.svg",
+    kicker: "Smart City · Live overview",
+    description: "Sensor, akses, dan kondisi kawasan dalam satu pandangan.",
+  },
+  control: {
+    image: "/images/control-scene.svg",
+    kicker: "ESP32 · Device control",
+    description: "Pilih otomatis dari sensor atau ambil kendali dari web.",
+  },
+  messages: {
+    image: "/images/messages-scene.svg",
+    kicker: "Sensor · Alert center",
+    description: "Peringatan membantu Anda merespons perubahan kondisi lebih cepat.",
+  },
+  chat: {
+    image: "/images/chat-scene.svg",
+    kicker: "AI · Sensor assistant",
+    description: "Tanyakan kondisi terkini perangkat dan sensor ESP32.",
+  },
+};
+
+function PageArtwork({ page }: { page: Page }) {
+  const artwork = pageArtwork[page];
+
+  return (
+    <article className="relative mb-6 min-h-[150px] overflow-hidden rounded-2xl border border-white/[0.09] bg-[#101714]">
+      <Image
+        src={artwork.image}
+        alt=""
+        fill
+        sizes="(max-width: 768px) 100vw, 80vw"
+        className="object-cover object-center opacity-75"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0b110e] via-[#0b110e]/75 to-transparent" />
+      <div className="relative flex min-h-[150px] max-w-xl flex-col justify-center p-5 sm:p-7">
+        <p className="text-[10px] font-semibold tracking-[0.2em] text-[#c7fa8f]">{artwork.kicker}</p>
+        <p className="mt-2 text-sm leading-6 text-[#dce5de] sm:text-base">{artwork.description}</p>
+      </div>
+    </article>
+  );
+}
+
+function OverrideControl({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: boolean | null;
+  disabled: boolean;
+  onChange: (value: boolean | null) => void;
+}) {
+  const options: Array<{ label: string; value: boolean | null }> = [
+    { label: "Otomatis", value: null },
+    { label: "Web ON", value: true },
+    { label: "Web OFF", value: false },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-2" role="group" aria-label="Mode kontrol perangkat">
+      {options.map((option) => (
+        <button
+          key={option.label}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(option.value)}
+          aria-pressed={value === option.value}
+          className={`rounded-lg border px-2 py-2 text-[11px] font-medium transition disabled:cursor-wait disabled:opacity-60 ${
+            value === option.value
+              ? "border-[#b7f36b]/30 bg-[#b7f36b]/10 text-[#c7fa8f]"
+              : "border-white/[0.07] bg-white/[0.02] text-[#98a49d] hover:bg-white/[0.06]"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const formatTime = (date: string) =>
   new Date(date).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -111,7 +197,11 @@ function StatusPill({ active, onText, offText }: { active: boolean; onText: stri
 export default function Home() {
   const [page, setPage] = useState<Page>("dashboard");
   const [readings, setReadings] = useState<Reading[]>([]);
-  const [rgbLedOn, setRgbLedOn] = useState(false);
+  const [deviceCommands, setDeviceCommands] = useState<DeviceCommands>({
+    rgbLedOn: false,
+    streetLightOverride: null,
+    temperatureServoOverride: null,
+  });
   const [loadingCommand, setLoadingCommand] = useState(false);
   const [online, setOnline] = useState(false);
   const [error, setError] = useState("");
@@ -123,14 +213,12 @@ export default function Home() {
   const [chatError, setChatError] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [enteringDashboard, setEnteringDashboard] = useState(false);
+  const enteringDashboard = true;
 
-  const enterDashboard = async () => {
-    if (enteringDashboard) return;
-    setEnteringDashboard(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 5000));
-    setShowSplash(false);
-  };
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowSplash(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -143,11 +231,11 @@ export default function Home() {
         throw new Error("Tidak dapat terhubung ke API atau MongoDB.");
       }
       const readingsData: { readings: Reading[] } = await readingsResponse.json();
-      const commandData: { rgbLedOn: boolean } = await commandResponse.json();
+      const commandData: DeviceCommands = await commandResponse.json();
       const messagesData: { messages: InboxMessage[]; unreadCount: number } =
         await messagesResponse.json();
       setReadings(readingsData.readings);
-      setRgbLedOn(commandData.rgbLedOn);
+      setDeviceCommands(commandData);
       setMessages(messagesData.messages);
       setUnreadCount(messagesData.unreadCount);
       setOnline(true);
@@ -173,6 +261,10 @@ export default function Home() {
   }, [refresh]);
 
   const latest = readings[0];
+  const temperatureServoOpen =
+    latest?.temperatureServoOpen ??
+    (deviceCommands.temperatureServoOverride ??
+      (latest?.temperatureC != null && latest.temperatureC > 28));
   const chartData = useMemo(
     () =>
       [...readings]
@@ -185,17 +277,17 @@ export default function Home() {
     [readings],
   );
 
-  const toggleLight = async () => {
+  const updateDeviceCommands = async (updates: Partial<DeviceCommands>) => {
     setLoadingCommand(true);
     try {
       const response = await fetch("/api/commands", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rgbLedOn: !rgbLedOn }),
+        body: JSON.stringify(updates),
       });
-      if (!response.ok) throw new Error("Perintah lampu gagal dikirim.");
-      const result: { rgbLedOn: boolean } = await response.json();
-      setRgbLedOn(result.rgbLedOn);
+      const result: DeviceCommands & { error?: string } = await response.json();
+      if (!response.ok) throw new Error(result.error || "Perintah perangkat gagal dikirim.");
+      setDeviceCommands(result);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Gagal mengirim perintah.");
@@ -203,6 +295,8 @@ export default function Home() {
       setLoadingCommand(false);
     }
   };
+
+  const rgbLedOn = deviceCommands.rgbLedOn;
 
   const markMessageRead = async (messageId: string) => {
     try {
@@ -306,10 +400,10 @@ export default function Home() {
           aria-label="Selamat datang"
         >
           <div className="splash-grid pointer-events-none absolute inset-0" />
-          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#9fe85d]/[0.08] blur-[110px]" />
+          <div className="splash-orb pointer-events-none absolute left-1/2 top-1/2 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#9fe85d]/[0.08] blur-[110px]" />
           <div className="relative w-full max-w-2xl animate-[splash-in_.7s_ease-out_both] rounded-[2rem] border border-white/[0.1] bg-[#0e1511]/90 p-7 shadow-[0_35px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:p-12">
             <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#b7f36b] text-[#11180e] shadow-[0_0_38px_rgba(183,243,107,0.2)]">
+              <span className="splash-logo flex h-12 w-12 items-center justify-center rounded-2xl bg-[#b7f36b] text-[#11180e] shadow-[0_0_38px_rgba(183,243,107,0.2)]">
                 <Activity size={25} strokeWidth={2.4} />
               </span>
               <div>
@@ -339,7 +433,7 @@ export default function Home() {
                 { label: "Notifikasi", value: "Peringatan perangkat", icon: MessageSquare },
                 { label: "AI Assistant", value: "Analisis kondisi ESP32", icon: Bot },
               ].map(({ label, value, icon: Icon }) => (
-                <div key={label} className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
+                <div key={label} className="splash-feature rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
                   <Icon size={16} className="text-[#b7f36b]" />
                   <p className="mt-3 text-[10px] tracking-[0.12em] text-[#76837a]">{label}</p>
                   <p className="mt-1 text-xs font-medium text-[#dce5de]">{value}</p>
@@ -348,23 +442,6 @@ export default function Home() {
             </div>
 
             <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
-              <button
-                onClick={() => void enterDashboard()}
-                disabled={enteringDashboard}
-                aria-describedby={enteringDashboard ? "dashboard-loading" : undefined}
-                className="group flex items-center gap-3 rounded-xl bg-[#b7f36b] px-5 py-3.5 text-sm font-semibold text-[#15200f] transition hover:-translate-y-0.5 hover:bg-[#c7fa8a] disabled:cursor-wait disabled:hover:translate-y-0"
-              >
-                {enteringDashboard ? (
-                  <>
-                    <LoaderCircle size={17} className="animate-spin" />
-                    Menyiapkan Dashboard
-                  </>
-                ) : (
-                  <>
-                    Masuk ke Dashboard <ArrowUpRight size={17} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                  </>
-                )}
-              </button>
               <span className="flex items-center gap-2 text-[11px] text-[#7d8a81]">
                 {enteringDashboard ? (
                   <span id="dashboard-loading" role="status" aria-live="polite">
@@ -465,7 +542,7 @@ export default function Home() {
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between border-b border-white/[0.07] bg-[#090e0c]/85 px-4 backdrop-blur-xl sm:px-8">
             <div className="flex items-center gap-3">
               <button
@@ -492,7 +569,7 @@ export default function Home() {
             </div>
           </header>
 
-          <section className="px-5 py-7 sm:px-8 sm:py-9">
+          <section className={`px-5 py-7 sm:px-8 sm:py-9 ${page === "chat" ? "flex flex-1 flex-col" : ""}`}>
             <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-medium tracking-[0.16em] text-[#9daa9f]">{page === "messages" ? "PUSAT NOTIFIKASI" : page === "chat" ? "ASISTEN SENSOR" : "MONITORING PERANGKAT"}</p>
@@ -500,13 +577,15 @@ export default function Home() {
                   {page === "dashboard" ? <>Kondisi <span className="text-[#b7f36b]">saat ini</span></> : page === "control" ? <>Kontrol <span className="text-[#b7f36b]">perangkat</span></> : page === "messages" ? <>Pesan <span className="text-[#b7f36b]">sensor</span></> : <>Chatbot <span className="text-[#b7f36b]">Gen AI</span></>}
                 </h1>
                 <p className="mt-2 text-sm text-[#8d9a91]">
-                  {page === "dashboard" ? "Ringkasan sensor dan aktivitas ESP32 secara realtime." : page === "control" ? "Kirim perintah langsung ke LED RGB pada board ESP32." : page === "messages" ? "Baca dan kelola peringatan yang dikirim dari sensor ESP32." : "Tanya kondisi ESP32; data terbaru dibaca langsung sebelum AI menjawab."}
+                  {page === "dashboard" ? "Ringkasan sensor dan aktivitas ESP32 secara realtime." : page === "control" ? "Kendalikan LED RGB, lampu jalan LDR, dan servo suhu DHT11." : page === "messages" ? "Baca dan kelola peringatan yang dikirim dari sensor ESP32." : "Tanya kondisi ESP32; data terbaru dibaca langsung sebelum AI menjawab."}
                 </p>
               </div>
               <button onClick={() => void refresh()} className="flex items-center gap-2 rounded-xl border border-white/[0.1] px-3.5 py-2.5 text-xs text-[#c2ccc5] transition hover:bg-white/[0.05]">
                 <RefreshCw size={14} /> Perbarui data
               </button>
             </div>
+
+            <PageArtwork page={page} />
 
             {error && (
               <div className="mb-5 flex items-center gap-2 rounded-xl border border-[#f5a76e]/20 bg-[#f5a76e]/[0.07] px-4 py-3 text-xs text-[#f3b58a]">
@@ -590,55 +669,59 @@ export default function Home() {
                 </div>
               </>
             ) : page === "control" ? (
-              <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-                <article className="rounded-2xl border border-white/[0.08] bg-[#101714]/90 p-6 sm:p-8">
+              <div className="grid gap-5 xl:grid-cols-3">
+                <article className="rounded-2xl border border-white/[0.08] bg-[#101714]/90 p-5 sm:p-6">
                   <div className="flex items-center gap-3">
-                    <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${rgbLedOn ? "bg-[#b7f36b]/15 text-[#c5f78b]" : "bg-white/[0.06] text-[#9aa69e]"}`}><Lightbulb size={23} /></span>
-                    <div><h2 className="text-base font-semibold">Lampu RGB · GPIO19</h2><p className="mt-1 text-xs text-[#89968e]">LED biru pada modul RGB ESP32</p></div>
+                    <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${rgbLedOn ? "bg-[#b7f36b]/15 text-[#c5f78b]" : "bg-white/[0.06] text-[#9aa69e]"}`}><Lightbulb size={21} /></span>
+                    <div><h2 className="text-sm font-semibold">Lampu RGB</h2><p className="mt-1 text-[11px] text-[#89968e]">LED biru · GPIO19</p></div>
                   </div>
-                  <div className="my-9 flex flex-col items-center rounded-2xl border border-white/[0.06] bg-[#0b100d] px-5 py-10">
-                    <span className={`relative flex h-28 w-28 items-center justify-center rounded-full border ${rgbLedOn ? "border-[#b7f36b]/40 bg-[#b7f36b]/[0.12] shadow-[0_0_70px_rgba(183,243,107,0.16)]" : "border-white/[0.08] bg-white/[0.025]"}`}>
-                      <Lightbulb size={42} strokeWidth={1.2} className={rgbLedOn ? "text-[#c9ff8c]" : "text-[#59645c]"} />
-                      {rgbLedOn && <span className="absolute inset-[-10px] rounded-full border border-[#b7f36b]/10" />}
-                    </span>
-                    <p className="mt-6 text-lg font-semibold">{rgbLedOn ? "Lampu menyala" : "Lampu mati"}</p>
-                    <p className="mt-1 text-xs text-[#87948b]">{rgbLedOn ? "GPIO19 berada pada kondisi HIGH" : "GPIO19 berada pada kondisi LOW"}</p>
-                    <button
-                      onClick={() => void toggleLight()}
-                      disabled={loadingCommand}
-                      className={`mt-7 flex min-w-[180px] items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${rgbLedOn ? "border border-white/[0.12] bg-white/[0.06] text-white hover:bg-white/[0.1]" : "bg-[#b7f36b] text-[#17200f] hover:bg-[#c7fa8a]"}`}
-                    >
-                      {loadingCommand ? <LoaderCircle size={16} className="animate-spin" /> : rgbLedOn ? <Check size={16} /> : <Lightbulb size={16} />}
-                      {loadingCommand ? "Mengirim perintah..." : rgbLedOn ? "Matikan lampu" : "Nyalakan lampu"}
-                    </button>
+                  <div className="my-6 flex items-center gap-4 rounded-xl border border-white/[0.06] bg-[#0b100d] p-4">
+                    <span className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border ${rgbLedOn ? "border-[#b7f36b]/40 bg-[#b7f36b]/[0.12] text-[#c9ff8c]" : "border-white/[0.08] bg-white/[0.025] text-[#59645c]"}`}><Lightbulb size={30} strokeWidth={1.2} /></span>
+                    <div><p className="text-sm font-semibold">{rgbLedOn ? "Lampu menyala" : "Lampu mati"}</p><p className="mt-1 text-[11px] text-[#87948b]">Kontrol langsung dari web</p></div>
                   </div>
-                  <p className="text-center text-[11px] leading-5 text-[#7f8c83]">Perintah diteruskan melalui API. ESP32 memeriksa perintah secara berkala dan memperbarui pin GPIO19.</p>
+                  <button
+                    onClick={() => void updateDeviceCommands({ rgbLedOn: !rgbLedOn })}
+                    disabled={loadingCommand}
+                    className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${rgbLedOn ? "border border-white/[0.12] bg-white/[0.06] text-white hover:bg-white/[0.1]" : "bg-[#b7f36b] text-[#17200f] hover:bg-[#c7fa8a]"}`}
+                  >
+                    {loadingCommand ? <LoaderCircle size={15} className="animate-spin" /> : rgbLedOn ? <Check size={15} /> : <Lightbulb size={15} />}
+                    {rgbLedOn ? "Matikan RGB" : "Nyalakan RGB"}
+                  </button>
                 </article>
 
-                <div className="space-y-5">
-                  <article className="rounded-2xl border border-white/[0.08] bg-[#101714]/90 p-5">
-                    <h2 className="text-sm font-semibold">Status perangkat</h2>
-                    <div className="mt-4 flex items-center justify-between rounded-xl bg-white/[0.025] p-4">
-                      <div className="flex items-center gap-3"><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${online ? "bg-[#b7f36b]/10 text-[#b7f36b]" : "bg-white/[0.05] text-[#89968e]"}`}><Radio size={17} /></span><div><p className="text-xs font-medium">ESP32 Smart City</p><p className="mt-1 text-[10px] text-[#849188]">esp32-smart-city</p></div></div>
-                      <StatusPill active={online && Boolean(latest)} onText="ONLINE" offText="OFFLINE" />
-                    </div>
-                    <div className="mt-4 space-y-3 text-xs">
-                      <div className="flex justify-between"><span className="text-[#89968e]">Pin output</span><span className="text-[#d4ddd6]">GPIO19 · LED biru</span></div>
-                      <div className="flex justify-between"><span className="text-[#89968e]">Terakhir menerima data</span><span className="text-[#d4ddd6]">{latest ? formatTime(latest.recordedAt) : "--"}</span></div>
-                    </div>
-                  </article>
-                  <article className="rounded-2xl border border-[#b7f36b]/10 bg-[#b7f36b]/[0.035] p-5">
-                    <div className="flex items-center gap-2 text-sm font-medium text-[#d5f8b3]"><Wifi size={16} /> Cara kerja kontrol</div>
-                    <ol className="mt-4 space-y-3 text-xs leading-5 text-[#a0afa2]">
-                      <li className="flex gap-2"><span className="text-[#b7f36b]">01</span> Dashboard menyimpan perintah ON/OFF ke MongoDB.</li>
-                      <li className="flex gap-2"><span className="text-[#b7f36b]">02</span> ESP32 memeriksa API dan membaca perintah terbaru.</li>
-                      <li className="flex gap-2"><span className="text-[#b7f36b]">03</span> Perubahan diterapkan pada pin LED GPIO19.</li>
-                    </ol>
-                  </article>
-                  <button onClick={() => setPage("dashboard")} className="flex w-full items-center justify-between rounded-xl border border-white/[0.08] px-4 py-3 text-xs text-[#aeb9b1] transition hover:bg-white/[0.04]">
-                    Kembali ke data dashboard <ArrowUpRight size={14} />
-                  </button>
-                </div>
+                <article className="rounded-2xl border border-white/[0.08] bg-[#101714]/90 p-5 sm:p-6">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#f7d879]/10 text-[#f7d879]"><Lightbulb size={21} /></span>
+                    <div><h2 className="text-sm font-semibold">Lampu jalan</h2><p className="mt-1 text-[11px] text-[#89968e]">LDR · GPIO34 / LED GPIO26</p></div>
+                  </div>
+                  <div className="my-6 flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0b100d] p-4">
+                    <div><p className="text-sm font-semibold">{latest?.streetLightOn ? "Lampu menyala" : "Lampu mati"}</p><p className="mt-1 text-[11px] text-[#87948b]">LDR {latest?.ldrRaw ?? "--"} · {deviceCommands.streetLightOverride === null ? "otomatis" : "kontrol web"}</p></div>
+                    <StatusPill active={latest?.streetLightOn ?? false} onText="ON" offText="OFF" />
+                  </div>
+                  <OverrideControl
+                    value={deviceCommands.streetLightOverride}
+                    disabled={loadingCommand}
+                    onChange={(value) => void updateDeviceCommands({ streetLightOverride: value })}
+                  />
+                  <p className="mt-3 text-[10px] leading-5 text-[#7f8c83]">LDR tetap bekerja di mode otomatis. Jika kondisi LDR memicu lampu, override web diterapkan setelah 10 detik.</p>
+                </article>
+
+                <article className="rounded-2xl border border-white/[0.08] bg-[#101714]/90 p-5 sm:p-6">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#83c9ff]/10 text-[#83c9ff]"><Gauge size={21} /></span>
+                    <div><h2 className="text-sm font-semibold">Servo suhu</h2><p className="mt-1 text-[11px] text-[#89968e]">DHT11 · GPIO4 / servo GPIO23</p></div>
+                  </div>
+                  <div className="my-6 flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0b100d] p-4">
+                    <div><p className="text-sm font-semibold">{temperatureServoOpen ? "Servo terbuka" : "Servo tertutup"}</p><p className="mt-1 text-[11px] text-[#87948b]">Suhu {latest?.temperatureC == null ? "--" : `${latest.temperatureC.toFixed(1)} °C`} · {deviceCommands.temperatureServoOverride === null ? "otomatis" : "kontrol web"}</p></div>
+                    <StatusPill active={temperatureServoOpen} onText="BUKA" offText="TUTUP" />
+                  </div>
+                  <OverrideControl
+                    value={deviceCommands.temperatureServoOverride}
+                    disabled={loadingCommand}
+                    onChange={(value) => void updateDeviceCommands({ temperatureServoOverride: value })}
+                  />
+                  <p className="mt-3 text-[10px] leading-5 text-[#7f8c83]">DHT11 tetap mengatur servo di mode otomatis. Jika suhu di atas 28 °C, override web diterapkan setelah 10 detik.</p>
+                </article>
               </div>
             ) : page === "messages" ? (
               <article className="rounded-2xl border border-white/[0.08] bg-[#101714]/90 p-5 sm:p-6">
@@ -709,8 +792,8 @@ export default function Home() {
                 )}
               </article>
             ) : (
-              <div className="grid gap-5">
-                <article className="flex min-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101714]/90">
+              <div className="flex min-h-0 flex-1 flex-col gap-5">
+                <article className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101714]/90">
                   <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-4">
                     <div className="flex items-center gap-3">
                       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#b7f36b]/10 text-[#b7f36b]"><Bot size={20} /></span>
@@ -718,7 +801,7 @@ export default function Home() {
                     </div>
                     <span className="rounded-full border border-[#b7f36b]/15 bg-[#b7f36b]/[0.06] px-2.5 py-1 text-[10px] text-[#c7fa8f]">OpenRouter · Free</span>
                   </div>
-                  <div className="flex-1 space-y-4 overflow-y-auto p-5">
+                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
                     {chatEntries.length === 0 && (
                       <div className="mx-auto mt-10 max-w-md text-center">
                         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04] text-[#b7f36b]"><MessageCircle size={22} /></span>

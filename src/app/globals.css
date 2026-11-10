@@ -162,6 +162,59 @@ button {
   mask-image: radial-gradient(ellipse at center, black 10%, transparent 78%);
 }
 
+.splash-orb {
+  animation: splash-glow 6s ease-in-out infinite;
+}
+
+.splash-logo {
+  animation: splash-logo 2s ease-in-out infinite;
+}
+
+.splash-feature {
+  animation: splash-feature-in 600ms ease-out both;
+}
+
+.splash-feature:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.splash-feature:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+@keyframes splash-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    scale: 0.94;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.06;
+  }
+}
+
+@keyframes splash-logo {
+  0%,
+  100% {
+    box-shadow: 0 0 24px rgba(183, 243, 107, 0.14);
+  }
+  50% {
+    box-shadow: 0 0 42px rgba(183, 243, 107, 0.38);
+  }
+}
+
+@keyframes splash-feature-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes dashboard-loading {
   from {
     transform: scaleX(0);

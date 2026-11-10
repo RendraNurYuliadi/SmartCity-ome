@@ -7,6 +7,8 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 #include "esp32_secrets.h"
 
 const char* API_READINGS_URL = "https://smarcityandhome.vercel.app/api/readings";
@@ -14,9 +16,27 @@ const char* API_COMMANDS_URL = "https://smarcityandhome.vercel.app/api/commands"
 const char* DEVICE_ID = "esp32-smart-city";
 #define API_USE_HTTPS 1
 
-const unsigned long INTERVAL_KIRIM_API = 2000UL;
+const unsigned long INTERVAL_KIRIM_API = 1000UL;
 const unsigned long INTERVAL_CEK_PERINTAH = 1000UL;
 const unsigned long INTERVAL_WIFI_ULANG = 10000UL;
+const unsigned long INTERVAL_ULTRASONIC_US = 60000UL;
+const unsigned long TIMEOUT_ULTRASONIC_US = 30000UL;
+
+struct PaketTelemetri {
+  char payload[768];
+};
+
+struct PaketPerintah {
+  bool rgbLedOn;
+  bool streetLightOverrideEnabled;
+  bool streetLightOverride;
+  bool temperatureServoOverrideEnabled;
+  bool temperatureServoOverride;
+  char updatedAt[32];
+};
+
+QueueHandle_t antreanTelemetri = nullptr;
+QueueHandle_t antreanPerintah = nullptr;
 
 // =================================
 // PIN ULTRASONIC
@@ -36,7 +56,7 @@ const unsigned long INTERVAL_WIFI_ULANG = 10000UL;
 #define PIR_PIN 14
 
 // =================================
-// PIN IR SENSOR SLOT PARKIR
+// PIN OUTPUT SENSOR SLOT PARKIR
 // =================================
 #define IR_SLOT_A_PIN 36
 #define IR_SLOT_B_PIN 39
@@ -123,7 +143,8 @@ const int batasJarak = 10;
 // =================================
 // WAKTU TUNGGU PALANG
 // =================================
-const unsigned long waktuTunggu = 10000UL;
+const unsigned long waktuTunggu = 3000UL;
+const unsigned long waktuTundaOverrideWeb = 10000UL;
 
 // =================================
 // WAKTU TRAFFIC LIGHT
@@ -203,6 +224,23 @@ bool statusLampuJalan = false;
 // Nanti nilai ini diisi dari API.
 // =================================
 bool statusLampuRGB = false;
+bool overrideLampuJalanAktif = false;
+bool statusLampuJalanManual = false;
+bool overrideLampuJalanTertunda = false;
+bool statusLampuJalanTertunda = false;
+unsigned long waktuMulaiTundaLampuJalan = 0;
+bool overrideServoSuhuAktif = false;
+bool statusServoSuhuManual = false;
+bool overrideServoSuhuTertunda = false;
+bool statusServoSuhuTertunda = false;
+unsigned long waktuMulaiTundaServoSuhu = 0;
+char updatedAtPerintahTerakhir[32] = "";
+bool statusPerintahLampuJalanDiketahui = false;
+bool statusPerintahServoSuhuDiketahui = false;
+bool perintahLampuJalanAktif = false;
+bool nilaiPerintahLampuJalan = false;
+bool perintahServoSuhuAktif = false;
+bool nilaiPerintahServoSuhu = false;
 
 bool slotATerisi = false;
 bool slotBTerisi = false;
@@ -215,6 +253,16 @@ bool suhuValid = false;
 unsigned long waktuKirimApiTerakhir = 0;
 unsigned long waktuCekPerintahTerakhir = 0;
 unsigned long waktuCobaWiFiTerakhir = 0;
+unsigned long waktuTriggerUltrasonik = 0;
+unsigned long waktuMulaiEcho = 0;
+unsigned long waktuMulaiPulsaTrigger = 0;
+unsigned long waktuSampelAirTerakhir = 0;
+long totalSampelAir = 0;
+int jumlahSampelAir = 0;
+int statusPengukuranUltrasonik = 0;
+
+void aturOverrideLampuJalan(bool enabled, bool value);
+void aturOverrideServoSuhu(bool enabled, bool value);
 
 // =================================
 // STATUS TRAFFIC LIGHT
@@ -231,7 +279,6 @@ unsigned long waktuTrafficTerakhir = 0;
 bool statusBanjir = false;
 bool statusBanjirSebelumnya = false;
 
-unsigned long waktuBacaAirTerakhir = 0;
 unsigned long waktuSerialAirTerakhir = 0;
 
 int nilaiAirTerakhir = 0;
@@ -295,9 +342,18 @@ void cekSlotParkir() {
   bool slotB = digitalRead(IR_SLOT_B_PIN) == IR_DETECTED_LEVEL;
   bool slotC = digitalRead(IR_SLOT_C_PIN) == IR_DETECTED_LEVEL;
 
+  static bool slotSudahDitampilkan = false;
+  bool berubah = !slotSudahDitampilkan ||
+                 slotA != slotATerisi ||
+                 slotB != slotBTerisi ||
+                 slotC != slotCTerisi;
+
   slotATerisi = slotA;
   slotBTerisi = slotB;
   slotCTerisi = slotC;
+
+  if (!berubah) return;
+  slotSudahDitampilkan = true;
 
   int jumlahTerisi = 0;
 
@@ -313,9 +369,9 @@ void cekSlotParkir() {
   snprintf(
     baris1,
     sizeof(baris1),
-    "A:%c B:%c C:%c",
-    slotA ? 'I' : 'K',
+    "OA:%c OB:%c OC:%c",
     slotB ? 'I' : 'K',
+    slotA ? 'I' : 'K',
     slotC ? 'I' : 'K'
   );
 
@@ -338,16 +394,16 @@ void cekSlotParkir() {
 
   Serial.println();
   Serial.println("================================");
-  Serial.println("       STATUS SLOT PARKIR");
+  Serial.println("      OUTPUT SLOT PARKIR");
   Serial.println("================================");
 
-  Serial.print("Slot A : ");
-  Serial.println(slotA ? "TERISI" : "KOSONG");
-
-  Serial.print("Slot B : ");
+  Serial.print("Output A : ");
   Serial.println(slotB ? "TERISI" : "KOSONG");
 
-  Serial.print("Slot C : ");
+  Serial.print("Output B : ");
+  Serial.println(slotA ? "TERISI" : "KOSONG");
+
+  Serial.print("Output C : ");
   Serial.println(slotC ? "TERISI" : "KOSONG");
 
   Serial.println("--------------------------------");
@@ -372,12 +428,18 @@ void cekSlotParkir() {
 // =================================
 // FUNGSI LDR DAN LED LAMPU JALAN
 // =================================
-void cekLampuJalan() {
+void terapkanStatusLampuJalan() {
+  if (overrideLampuJalanTertunda &&
+      millis() - waktuMulaiTundaLampuJalan >= waktuTundaOverrideWeb) {
+    overrideLampuJalanTertunda = false;
+    overrideLampuJalanAktif = true;
+    statusLampuJalanManual = statusLampuJalanTertunda;
+    Serial.println("Override lampu jalan dari web diterapkan.");
+  }
 
-  int nilaiLDR = analogRead(LDR_PIN);
-  nilaiLDRTerakhir = nilaiLDR;
-
-  statusLampuJalan = (nilaiLDR >= BATAS_LDR);
+  statusLampuJalan = overrideLampuJalanAktif ?
+                     statusLampuJalanManual :
+                     nilaiLDRTerakhir >= BATAS_LDR;
 
   digitalWrite(
     LED_JALAN_PIN,
@@ -385,27 +447,36 @@ void cekLampuJalan() {
     LED_ON_LEVEL :
     (LED_ON_LEVEL == HIGH ? LOW : HIGH)
   );
+}
 
-  Serial.println();
-  Serial.println("================================");
-  Serial.println("      STATUS LAMPU JALAN");
-  Serial.println("================================");
+void cekLampuJalan() {
 
-  Serial.print("Nilai sensor LDR : ");
-  Serial.println(nilaiLDR);
+  int nilaiLDR = analogRead(LDR_PIN);
+  nilaiLDRTerakhir = nilaiLDR;
 
-  if (statusLampuJalan) {
+  terapkanStatusLampuJalan();
+}
 
-    Serial.println("Kondisi           : GELAP");
-    Serial.println("LED Lampu Jalan   : MENYALA");
+void aturOverrideLampuJalan(bool enabled, bool value) {
+  overrideLampuJalanTertunda = false;
+  overrideLampuJalanAktif = false;
 
-  } else {
-
-    Serial.println("Kondisi           : TERANG");
-    Serial.println("LED Lampu Jalan   : MATI");
+  if (!enabled) {
+    terapkanStatusLampuJalan();
+    return;
   }
 
-  Serial.println("================================");
+  if (nilaiLDRTerakhir >= BATAS_LDR) {
+    statusLampuJalanTertunda = value;
+    waktuMulaiTundaLampuJalan = millis();
+    overrideLampuJalanTertunda = true;
+    Serial.println("Override lampu jalan dijadwalkan 10 detik.");
+    return;
+  }
+
+  overrideLampuJalanAktif = true;
+  statusLampuJalanManual = value;
+  terapkanStatusLampuJalan();
 }
 
 // =================================
@@ -433,15 +504,6 @@ void aturLampuRGB() {
     (LED_RGB_ON_LEVEL == HIGH ? LOW : HIGH)
   );
 
-  Serial.println();
-  Serial.println("================================");
-  Serial.println("         STATUS LED RGB");
-  Serial.println("================================");
-
-  Serial.print("LED RGB (B/GPIO19) : ");
-  Serial.println(statusLampuRGB ? "MENYALA" : "MATI");
-
-  Serial.println("================================");
 }
 
 // =================================
@@ -468,6 +530,10 @@ void cekTrafficLight() {
       statusTrafficLight = 0;
     }
   }
+
+  static int statusTrafficDiterapkan = -1;
+  if (statusTrafficDiterapkan == statusTrafficLight) return;
+  statusTrafficDiterapkan = statusTrafficLight;
 
   digitalWrite(TRAFFIC_RED_PIN, LOW);
   digitalWrite(TRAFFIC_YELLOW_PIN, LOW);
@@ -522,12 +588,25 @@ void cekPerintahLampuDariAPI() {
 
   int kodeHTTP = http.GET();
   if (kodeHTTP == HTTP_CODE_OK) {
-    StaticJsonDocument<256> dokumen;
+    StaticJsonDocument<384> dokumen;
     DeserializationError error = deserializeJson(dokumen, http.getString());
     if (!error && dokumen["deviceId"] == DEVICE_ID &&
         dokumen["rgbLedOn"].is<bool>()) {
-      statusLampuRGB = dokumen["rgbLedOn"].as<bool>();
-      aturLampuRGB();
+      const char* updatedAt = dokumen["updatedAt"] | "";
+      if (updatedAt[0] != '\0' && antreanPerintah != nullptr) {
+        PaketPerintah perintah = {};
+        perintah.rgbLedOn = dokumen["rgbLedOn"].as<bool>();
+        perintah.streetLightOverrideEnabled =
+          dokumen["streetLightOverride"].is<bool>();
+        perintah.streetLightOverride =
+          dokumen["streetLightOverride"].as<bool>();
+        perintah.temperatureServoOverrideEnabled =
+          dokumen["temperatureServoOverride"].is<bool>();
+        perintah.temperatureServoOverride =
+          dokumen["temperatureServoOverride"].as<bool>();
+        strncpy(perintah.updatedAt, updatedAt, sizeof(perintah.updatedAt) - 1);
+        xQueueOverwrite(antreanPerintah, &perintah);
+      }
     } else if (error) {
       Serial.print("JSON perintah tidak valid: ");
       Serial.println(error.c_str());
@@ -539,14 +618,14 @@ void cekPerintahLampuDariAPI() {
   http.end();
 }
 
-void kirimDataSensorKeAPI() {
-  if (WiFi.status() != WL_CONNECTED ||
+void jadwalkanDataSensorKeAPI() {
+  if (antreanTelemetri == nullptr ||
       millis() - waktuKirimApiTerakhir < INTERVAL_KIRIM_API) {
     return;
   }
-
   waktuKirimApiTerakhir = millis();
 
+  PaketTelemetri paket;
   StaticJsonDocument<768> dokumen;
   dokumen["deviceId"] = DEVICE_ID;
   if (suhuValid) {
@@ -582,10 +661,19 @@ void kirimDataSensorKeAPI() {
                             statusTrafficLight == 1 ? "yellow" : "red";
   dokumen["entryGateOpen"] = statusPalangMasuk;
   dokumen["exitGateOpen"] = statusPalangKeluar;
+  dokumen["temperatureServoOpen"] = statusServoSuhuTerbuka;
 
-  String payload;
-  serializeJson(dokumen, payload);
+  size_t panjangPayload =
+    serializeJson(dokumen, paket.payload, sizeof(paket.payload));
+  if (panjangPayload == 0) {
+    Serial.println("Gagal membentuk data telemetri.");
+    return;
+  }
 
+  xQueueOverwrite(antreanTelemetri, &paket);
+}
+
+void kirimDataSensorKeAPI(const PaketTelemetri& paket) {
 #if API_USE_HTTPS
   WiFiClientSecure client;
   client.setInsecure();  // Untuk uji coba; validasi CA diperlukan untuk produksi.
@@ -601,7 +689,7 @@ void kirimDataSensorKeAPI() {
   }
 
   http.addHeader("Content-Type", "application/json");
-  int kodeHTTP = http.POST(payload);
+  int kodeHTTP = http.POST(paket.payload);
   if (kodeHTTP == HTTP_CODE_CREATED) {
     Serial.println("Data sensor berhasil dikirim ke API.");
   } else {
@@ -611,21 +699,28 @@ void kirimDataSensorKeAPI() {
   http.end();
 }
 
+void tugasJaringan(void* parameter) {
+  (void)parameter;
+  PaketTelemetri paket;
+
+  for (;;) {
+    jagaKoneksiWiFi();
+
+    if (WiFi.status() == WL_CONNECTED &&
+        xQueueReceive(antreanTelemetri, &paket, 0) == pdTRUE) {
+      kirimDataSensorKeAPI(paket);
+    }
+
+    cekPerintahLampuDariAPI();
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
 // =================================
 // FUNGSI MEMBACA WATER LEVEL
 // =================================
 int bacaWaterLevel() {
-
-  long totalNilai = 0;
-
-  for (int i = 0; i < JUMLAH_SAMPEL_AIR; i++) {
-
-    totalNilai += analogRead(WATER_LEVEL_PIN);
-
-    delay(2);
-  }
-
-  return totalNilai / JUMLAH_SAMPEL_AIR;
+  return analogRead(WATER_LEVEL_PIN);
 }
 
 // =================================
@@ -713,22 +808,25 @@ void cekWaterLevel() {
 
   unsigned long waktuSekarang = millis();
 
-  if (
-    waktuSekarang - waktuBacaAirTerakhir
-    >= INTERVAL_BACA_AIR
-  ) {
+  const unsigned long intervalSampel =
+    INTERVAL_BACA_AIR / JUMLAH_SAMPEL_AIR;
+  if (waktuSekarang - waktuSampelAirTerakhir >= intervalSampel) {
+    waktuSampelAirTerakhir = waktuSekarang;
+    totalSampelAir += bacaWaterLevel();
+    jumlahSampelAir++;
 
-    waktuBacaAirTerakhir = waktuSekarang;
+    if (jumlahSampelAir >= JUMLAH_SAMPEL_AIR) {
+      nilaiAirTerakhir = totalSampelAir / JUMLAH_SAMPEL_AIR;
+      totalSampelAir = 0;
+      jumlahSampelAir = 0;
+      statusBanjir = (nilaiAirTerakhir >= BATAS_BANJIR);
 
-    nilaiAirTerakhir = bacaWaterLevel();
+      if (statusBanjir && !statusBanjirSebelumnya) {
+        aktifkanAlarm("WATER LEVEL / BANJIR");
+      }
 
-    statusBanjir = (nilaiAirTerakhir >= BATAS_BANJIR);
-
-    if (statusBanjir && !statusBanjirSebelumnya) {
-      aktifkanAlarm("WATER LEVEL / BANJIR");
+      statusBanjirSebelumnya = statusBanjir;
     }
-
-    statusBanjirSebelumnya = statusBanjir;
   }
 
   if (
@@ -793,12 +891,6 @@ void cekGetaran() {
 
   statusGetaranSebelumnya = statusGetaran;
 
-  Serial.print("SW-420 : ");
-  Serial.println(
-    statusGetaran ?
-    "GETARAN TERDETEKSI" :
-    "NORMAL"
-  );
 }
 
 // =================================
@@ -812,6 +904,50 @@ void aturServoSuhu() {
     posisiAktif :
     posisiAwal
   );
+}
+
+void terapkanOverrideServoSuhuTertunda() {
+  if (!overrideServoSuhuTertunda ||
+      millis() - waktuMulaiTundaServoSuhu < waktuTundaOverrideWeb) {
+    return;
+  }
+
+  overrideServoSuhuTertunda = false;
+  overrideServoSuhuAktif = true;
+  statusServoSuhuManual = statusServoSuhuTertunda;
+  statusServoSuhuTerbuka = statusServoSuhuManual;
+  aturServoSuhu();
+  Serial.println("Override servo suhu dari web diterapkan.");
+}
+
+void aturOverrideServoSuhu(bool enabled, bool value) {
+  overrideServoSuhuTertunda = false;
+  overrideServoSuhuAktif = false;
+
+  if (!enabled) {
+    if (suhuValid) {
+      if (suhuSekarang > BATAS_SUHU) {
+        statusServoSuhuTerbuka = true;
+      } else if (suhuSekarang < BATAS_SUHU) {
+        statusServoSuhuTerbuka = false;
+      }
+    }
+    aturServoSuhu();
+    return;
+  }
+
+  if (suhuValid && suhuSekarang > BATAS_SUHU) {
+    statusServoSuhuTertunda = value;
+    waktuMulaiTundaServoSuhu = millis();
+    overrideServoSuhuTertunda = true;
+    Serial.println("Override servo suhu dijadwalkan 10 detik.");
+    return;
+  }
+
+  overrideServoSuhuAktif = true;
+  statusServoSuhuManual = value;
+  statusServoSuhuTerbuka = value;
+  aturServoSuhu();
 }
 
 // =================================
@@ -875,13 +1011,15 @@ void cekSuhuDanServo() {
   // KONTROL SERVO BERDASARKAN SUHU
   // =================================
 
-  if (suhuSekarang > BATAS_SUHU) {
+  if (!overrideServoSuhuAktif && !overrideServoSuhuTertunda &&
+      suhuSekarang > BATAS_SUHU) {
 
     // Di atas 28 derajat: buka 90 derajat
     // dan tetap terbuka selama suhu belum turun di bawah 28
     statusServoSuhuTerbuka = true;
 
-  } else if (suhuSekarang < BATAS_SUHU) {
+  } else if (!overrideServoSuhuAktif && !overrideServoSuhuTertunda &&
+             suhuSekarang < BATAS_SUHU) {
 
     // Di bawah 28 derajat: tutup ke 0 derajat
     statusServoSuhuTerbuka = false;
@@ -906,6 +1044,96 @@ void cekSuhuDanServo() {
   Serial.println("================================");
 }
 
+void bacaUltrasonikNonblocking() {
+  unsigned long waktuSekarang = micros();
+
+  if (statusPengukuranUltrasonik == 0 &&
+      waktuSekarang - waktuTriggerUltrasonik >= INTERVAL_ULTRASONIC_US) {
+    digitalWrite(TRIG_PIN, LOW);
+    waktuMulaiPulsaTrigger = waktuSekarang;
+    statusPengukuranUltrasonik = 4;
+    return;
+  }
+
+  if (statusPengukuranUltrasonik == 4 &&
+      waktuSekarang - waktuMulaiPulsaTrigger >= 2UL) {
+    digitalWrite(TRIG_PIN, HIGH);
+    waktuMulaiPulsaTrigger = waktuSekarang;
+    waktuTriggerUltrasonik = waktuSekarang;
+    statusPengukuranUltrasonik = 1;
+  }
+
+  if (statusPengukuranUltrasonik == 1 &&
+      waktuSekarang - waktuMulaiPulsaTrigger >= 10UL) {
+    digitalWrite(TRIG_PIN, LOW);
+    statusPengukuranUltrasonik = 2;
+  }
+
+  if (statusPengukuranUltrasonik == 2) {
+    if (digitalRead(ECHO_PIN) == HIGH) {
+      waktuMulaiEcho = waktuSekarang;
+      statusPengukuranUltrasonik = 3;
+    } else if (waktuSekarang - waktuTriggerUltrasonik >= TIMEOUT_ULTRASONIC_US) {
+      jarakValid = false;
+      statusPengukuranUltrasonik = 0;
+    }
+  } else if (statusPengukuranUltrasonik == 3) {
+    if (digitalRead(ECHO_PIN) == LOW) {
+      unsigned long durasi = waktuSekarang - waktuMulaiEcho;
+      jarakTerakhir = durasi * 0.0343f / 2.0f;
+      jarakValid = true;
+      statusPengukuranUltrasonik = 0;
+    } else if (waktuSekarang - waktuMulaiEcho >= TIMEOUT_ULTRASONIC_US) {
+      jarakValid = false;
+      statusPengukuranUltrasonik = 0;
+    }
+  }
+}
+
+void terapkanPerintahApiLokal() {
+  PaketPerintah perintah;
+  if (antreanPerintah != nullptr &&
+      xQueueReceive(antreanPerintah, &perintah, 0) == pdTRUE &&
+      strcmp(perintah.updatedAt, updatedAtPerintahTerakhir) != 0) {
+    strncpy(
+      updatedAtPerintahTerakhir,
+      perintah.updatedAt,
+      sizeof(updatedAtPerintahTerakhir) - 1
+    );
+
+    if (perintah.rgbLedOn != statusLampuRGB) {
+      statusLampuRGB = perintah.rgbLedOn;
+      aturLampuRGB();
+    }
+
+    if (!statusPerintahLampuJalanDiketahui ||
+        perintah.streetLightOverrideEnabled != perintahLampuJalanAktif ||
+        (perintah.streetLightOverrideEnabled &&
+         perintah.streetLightOverride != nilaiPerintahLampuJalan)) {
+      aturOverrideLampuJalan(
+        perintah.streetLightOverrideEnabled,
+        perintah.streetLightOverride
+      );
+      statusPerintahLampuJalanDiketahui = true;
+      perintahLampuJalanAktif = perintah.streetLightOverrideEnabled;
+      nilaiPerintahLampuJalan = perintah.streetLightOverride;
+    }
+
+    if (!statusPerintahServoSuhuDiketahui ||
+        perintah.temperatureServoOverrideEnabled != perintahServoSuhuAktif ||
+        (perintah.temperatureServoOverrideEnabled &&
+         perintah.temperatureServoOverride != nilaiPerintahServoSuhu)) {
+      aturOverrideServoSuhu(
+        perintah.temperatureServoOverrideEnabled,
+        perintah.temperatureServoOverride
+      );
+      statusPerintahServoSuhuDiketahui = true;
+      perintahServoSuhuAktif = perintah.temperatureServoOverrideEnabled;
+      nilaiPerintahServoSuhu = perintah.temperatureServoOverride;
+    }
+  }
+}
+
 // =================================
 // SETUP
 // =================================
@@ -915,22 +1143,12 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   waktuCobaWiFiTerakhir = millis();
-  Serial.print("Menghubungkan Wi-Fi");
-  for (int percobaan = 0; percobaan < 20 && WiFi.status() != WL_CONNECTED; percobaan++) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println();
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("Wi-Fi tersambung. IP ESP32: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("Wi-Fi belum tersambung; ESP32 akan mencoba lagi otomatis.");
-  }
+  Serial.println("Wi-Fi menghubungkan di latar belakang.");
 
   // SETUP ULTRASONIC
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
+  digitalWrite(TRIG_PIN, LOW);
 
   // SETUP PIR
   pinMode(PIR_PIN, INPUT);
@@ -1015,14 +1233,6 @@ void setup() {
   lcd.backlight();
   lcd.clear();
 
-  lcd.setCursor(0, 0);
-  lcd.print("SISTEM PARKIR");
-
-  lcd.setCursor(0, 1);
-  lcd.print("ESP32 AKTIF");
-
-  delay(2000);
-
   lcd.clear();
 
   // SETUP SERVO 1
@@ -1053,7 +1263,7 @@ void setup() {
   Serial.println("PIR        : Palang Keluar");
   Serial.println("Servo 2    : Palang Keluar");
 
-  Serial.println("IR A,B,C   : Slot Parkir");
+  Serial.println("Output A/B/C: Slot Parkir");
   Serial.println("LCD 1602   : Tampilan Slot");
 
   Serial.println("LDR        : Deteksi Cahaya");
@@ -1069,7 +1279,7 @@ void setup() {
 
   Serial.println("Durasi Alarm: 10 Detik");
   Serial.println("Waktu Traffic: 10 Detik");
-  Serial.println("Waktu Palang : 10 Detik");
+  Serial.println("Waktu Palang : 3 Detik");
 
   Serial.println("--------------------------------");
 
@@ -1091,13 +1301,36 @@ void setup() {
   cekTrafficLight();
   aturLampuRGB();
 
-  waktuBacaAirTerakhir = millis();
   waktuSerialAirTerakhir = millis();
 
   Serial.println();
   Serial.println("Monitoring Water Level dimulai.");
   Serial.println("Monitoring SW-420 dimulai.");
   Serial.println("Monitoring DHT11 dimulai.");
+
+  waktuTriggerUltrasonik = micros() - INTERVAL_ULTRASONIC_US;
+  waktuSampelAirTerakhir = millis();
+  waktuKirimApiTerakhir = millis() - INTERVAL_KIRIM_API;
+  antreanTelemetri = xQueueCreate(1, sizeof(PaketTelemetri));
+  antreanPerintah = xQueueCreate(1, sizeof(PaketPerintah));
+
+  if (antreanTelemetri == nullptr || antreanPerintah == nullptr) {
+    Serial.println("Gagal membuat antrean jaringan; API tidak dijalankan.");
+    return;
+  }
+
+  BaseType_t statusTask = xTaskCreatePinnedToCore(
+    tugasJaringan,
+    "tugasJaringan",
+    8192,
+    nullptr,
+    1,
+    nullptr,
+    0
+  );
+  if (statusTask != pdPASS) {
+    Serial.println("Gagal membuat task jaringan; API tidak dijalankan.");
+  }
 }
 
 // =================================
@@ -1107,71 +1340,29 @@ void loop() {
 
   unsigned long waktuSekarang = millis();
 
+  terapkanPerintahApiLokal();
+  bacaUltrasonikNonblocking();
+
   // =================================
   // BAGIAN 1
   // ULTRASONIC DAN SERVO 1
   // PALANG MASUK
   // =================================
 
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-
-  digitalWrite(TRIG_PIN, LOW);
-
-  long durasi = pulseIn(ECHO_PIN, HIGH, 30000);
-
-  float jarak = durasi * 0.0343 / 2;
-  jarakValid = durasi > 0;
-  if (jarakValid) jarakTerakhir = jarak;
-
-  bool kendaraanMasuk =
-    (durasi > 0 && jarak <= batasJarak);
-
-  Serial.println();
-  Serial.println("--- PALANG MASUK ---");
+  bool kendaraanMasuk = jarakValid && jarakTerakhir <= batasJarak;
 
   if (kendaraanMasuk) {
-
+    bool palangBaruTerbuka = !statusPalangMasuk;
     statusPalangMasuk = true;
     waktuMasuk = waktuSekarang;
-
-    myServo.write(posisiAktif);
-
-    Serial.print("Jarak kendaraan: ");
-    Serial.print(jarak);
-    Serial.println(" cm");
-
-    Serial.println("Status: TRUE");
-    Serial.println("Palang masuk TERBUKA");
-
-  } else if (statusPalangMasuk) {
-
-    if (waktuSekarang - waktuMasuk >= waktuTunggu) {
-
-      statusPalangMasuk = false;
-
-      myServo.write(posisiAwal);
-
-      Serial.println("Status: FALSE");
-      Serial.println("10 detik selesai");
-      Serial.println("Palang masuk TERTUTUP");
-
-    } else {
-
+    if (palangBaruTerbuka) {
       myServo.write(posisiAktif);
-
-      Serial.println("Status: TRUE");
-      Serial.println("Menunggu 10 detik...");
+      Serial.println("Palang masuk TERBUKA");
     }
-
-  } else {
-
+  } else if (statusPalangMasuk &&
+             waktuSekarang - waktuMasuk >= waktuTunggu) {
+    statusPalangMasuk = false;
     myServo.write(posisiAwal);
-
-    Serial.println("Status: FALSE");
     Serial.println("Palang masuk TERTUTUP");
   }
 
@@ -1181,50 +1372,23 @@ void loop() {
   // PALANG KELUAR
   // =================================
 
-  Serial.println();
-  Serial.println("--- PALANG KELUAR ---");
-
   int statusPIR = digitalRead(PIR_PIN);
 
   bool kendaraanKeluar = (statusPIR == HIGH);
   pirTerdeteksi = kendaraanKeluar;
 
   if (kendaraanKeluar) {
-
+    bool palangBaruTerbuka = !statusPalangKeluar;
     statusPalangKeluar = true;
     waktuKeluar = waktuSekarang;
-
-    myServo2.write(posisiAktif);
-
-    Serial.println("Status: TRUE");
-    Serial.println("Gerakan terdeteksi!");
-    Serial.println("Palang keluar TERBUKA");
-
-  } else if (statusPalangKeluar) {
-
-    if (waktuSekarang - waktuKeluar >= waktuTunggu) {
-
-      statusPalangKeluar = false;
-
-      myServo2.write(posisiAwal);
-
-      Serial.println("Status: FALSE");
-      Serial.println("10 detik selesai");
-      Serial.println("Palang keluar TERTUTUP");
-
-    } else {
-
+    if (palangBaruTerbuka) {
       myServo2.write(posisiAktif);
-
-      Serial.println("Status: TRUE");
-      Serial.println("Menunggu 10 detik...");
+      Serial.println("Palang keluar TERBUKA");
     }
-
-  } else {
-
+  } else if (statusPalangKeluar &&
+             waktuSekarang - waktuKeluar >= waktuTunggu) {
+    statusPalangKeluar = false;
     myServo2.write(posisiAwal);
-
-    Serial.println("Status: FALSE");
     Serial.println("Palang keluar TERTUTUP");
   }
 
@@ -1276,21 +1440,7 @@ void loop() {
   // =================================
 
   cekSuhuDanServo();
+  terapkanOverrideServoSuhuTertunda();
 
-  // =================================
-  // BAGIAN 10
-  // LED RGB (nilai dari statusLampuRGB)
-  // =================================
-
-  aturLampuRGB();
-
-  jagaKoneksiWiFi();
-  cekPerintahLampuDariAPI();
-  kirimDataSensorKeAPI();
-
-  // =================================
-  // JEDA PEMBACAAN
-  // =================================
-
-  delay(1000);
+  jadwalkanDataSensorKeAPI();
 }

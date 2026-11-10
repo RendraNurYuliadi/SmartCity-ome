@@ -44,6 +44,8 @@ function isReadingPayload(
     isBoolean(reading.pirDetected) &&
     Number.isInteger(reading.ldrRaw) &&
     isBoolean(reading.streetLightOn) &&
+    (reading.temperatureServoOpen === undefined ||
+      isBoolean(reading.temperatureServoOpen)) &&
     Number.isInteger(reading.waterLevelRaw) &&
     isBoolean(reading.floodDetected) &&
     isBoolean(reading.vibrationDetected) &&

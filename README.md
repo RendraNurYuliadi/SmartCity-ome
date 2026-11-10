@@ -1,6 +1,6 @@
 # Smart Home & City IoT
 
-Dashboard Next.js untuk menerima telemetri ESP32, menyimpan 50 pembacaan terbaru di MongoDB, dan mengendalikan LED RGB biru pada GPIO19.
+Dashboard Next.js untuk menerima telemetri ESP32, menyimpan 50 pembacaan terbaru di MongoDB, serta mengendalikan LED RGB, lampu jalan berbasis LDR, dan servo suhu DHT11.
 
 ## Stack
 
@@ -30,6 +30,7 @@ Dashboard Next.js untuk menerima telemetri ESP32, menyimpan 50 pembacaan terbaru
   "pirDetected": "boolean",
   "ldrRaw": "number",
   "streetLightOn": "boolean",
+  "temperatureServoOpen": "boolean (opsional untuk firmware lama)",
   "waterLevelRaw": "number",
   "floodDetected": "boolean",
   "vibrationDetected": "boolean",
@@ -40,7 +41,7 @@ Dashboard Next.js untuk menerima telemetri ESP32, menyimpan 50 pembacaan terbaru
 }
 ```
 
-`device_commands` menyimpan `{ "_id": "esp32-smart-city", "rgbLedOn": "boolean", "updatedAt": "Date" }`.
+`device_commands` menyimpan status LED RGB dan override opsional `streetLightOverride` serta `temperatureServoOverride`. Nilai override `true`/`false` memilih kontrol web; `null` mengembalikan perangkat ke mode otomatis sensor.
 
 Pada dashboard, label Slot A dan Slot B ditukar: `parking.slotAOccupied` (IR A/GPIO36) ditampilkan sebagai Slot B, sedangkan `parking.slotBOccupied` (IR B/GPIO39) ditampilkan sebagai Slot A. Data mentah API dan jumlah total slot tidak berubah.
 
@@ -60,15 +61,15 @@ Collection pembacaan aktif adalah capped collection MongoDB dengan `max: 50`. Sa
 
 - `POST /api/readings` — menerima satu pembacaan sensor dari ESP32.
 - `GET /api/readings?limit=50` — membaca paling banyak 50 data terbaru.
-- `GET /api/commands` — membaca status perintah LED terakhir.
-- `POST /api/commands` dengan `{"rgbLedOn":true}` atau `{"rgbLedOn":false}` — mengubah status perintah LED.
+- `GET /api/commands` — membaca status LED dan override perangkat.
+- `POST /api/commands` menerima satu atau beberapa field: `rgbLedOn` (`boolean`), `streetLightOverride` (`boolean | null`), dan `temperatureServoOverride` (`boolean | null`).
 - `GET /api/messages` — mengambil inbox dan jumlah pesan belum dibaca.
 - `POST /api/messages` dengan `{"ids":["<message-id>"]}` atau `{"all":true}` — menandai pesan sudah dibaca.
 - `POST /api/chat` — mengambil snapshot sensor langsung dari MongoDB lalu mengirim pertanyaan dan snapshot tersebut ke model AI gratis OpenRouter.
 
 Pesan dibuat saat sensor berubah menjadi kondisi banjir, getaran, gerakan, suhu di atas 28 °C, atau parkir penuh. Dashboard memeriksa data dan badge pesan setiap 1,5 detik; membuka pesan menandainya sudah dibaca dan mengurangi angka badge.
 
-Dashboard memeriksa API setiap 1,5 detik. ESP32 mengirim telemetri setiap 2 detik dan memeriksa perintah setiap 1 detik. Polling ini juga kompatibel dengan deployment serverless Vercel tanpa koneksi WebSocket permanen.
+Dashboard memeriksa API setiap 1,5 detik. ESP32 mengirim telemetri setiap 1 detik dan memeriksa perintah setiap 1 detik. Palang PIR dan ultrasonik kembali tertutup 3 detik setelah pemicunya berhenti. Override web untuk lampu jalan atau servo suhu menunggu 10 detik bila kondisi pemicu sensor terkait sedang aktif; selain itu perintah diterapkan segera. Polling ini juga kompatibel dengan deployment serverless Vercel tanpa koneksi WebSocket permanen.
 
 ## Chatbot OpenRouter gratis
 
@@ -98,16 +99,17 @@ API tidak memakai autentikasi sesuai kebutuhan proyek ini. Endpoint yang dipubli
 
 ## Menghubungkan ESP32
 
-Kode firmware final satu file ada di `Code_iot_esp_32_Update.txt` dan sudah berisi konfigurasi Wi-Fi serta endpoint Vercel. File ini mengandung password Wi-Fi; jangan commit atau push perubahan lokal tersebut ke repository.
+Sketch firmware ada di `Code_iot_esp_32_Update/Code_iot_esp_32_Update.ino`. Sebelum upload, salin `Code_iot_esp_32_Update/esp32_secrets.example.h` menjadi `Code_iot_esp_32_Update/esp32_secrets.h` dan isi kredensial Wi-Fi. File rahasia tersebut diabaikan Git.
 
 1. Pasang library ArduinoJson, DHT sensor library, LiquidCrystal I2C, dan ESP32Servo di Arduino IDE.
-2. Buat sketch baru di Arduino IDE, salin seluruh isi `Code_iot_esp_32_Update.txt`, lalu simpan sebagai `Code_iot_esp_32_Update.ino`.
-3. Pilih board dan port ESP32, lalu upload.
-4. Pastikan ESP32 tersambung ke internet. Perintah LED mengubah kanal B pada GPIO19; kanal R/G tetap mati.
+2. Salin file contoh secrets ke `esp32_secrets.h` di folder sketch dan isi nama Wi-Fi 2,4 GHz serta password.
+3. Buka `Code_iot_esp_32_Update/Code_iot_esp_32_Update.ino` di Arduino IDE.
+4. Pilih board dan port ESP32, lalu upload.
+5. Pastikan ESP32 tersambung ke internet. Mode kontrol lampu jalan dan servo suhu dapat dipilih dari menu Kontrol ESP32 di dashboard.
 
-Untuk mengganti Wi-Fi, edit nilai `WIFI_SSID` dan `WIFI_PASSWORD` di bagian atas file.
+Untuk mengganti Wi-Fi, edit nilai `WIFI_SSID` dan `WIFI_PASSWORD` di `esp32_secrets.h`.
 
-Firmware mempertahankan sensor yang sudah ada pada sketch awal (ultrasonik, PIR, IR parkir, LDR, water-level, SW-420, DHT11, lampu lalu lintas, servo, buzzer, dan LCD) serta mengirim nilainya ke API.
+Firmware mempertahankan sensor yang sudah ada pada sketch awal (ultrasonik, PIR, IR parkir, LDR, water-level, SW-420, DHT11, lampu lalu lintas, servo, buzzer, dan LCD) serta mengirim nilainya ke API. Servo palang kembali ke posisi awal 3 detik setelah pemicu sensor berhenti; servo suhu dan lampu jalan memiliki mode otomatis serta override web.
 
 ESP32 klasik hanya mendukung Wi-Fi 2,4 GHz. Jika jaringan yang dipilih hanya berjalan pada 5 GHz, aktifkan/pilih SSID 2,4 GHz dari router atau hotspot; jaringan 2,4 GHz dan 5 GHz boleh memakai nama berbeda.
 
